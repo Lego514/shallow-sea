@@ -40,7 +40,7 @@ Wallpaper Engine has no buttons in its settings, so **New seabed** and **Show se
 | Hold the cursor still | Curious little fish gather around it |
 | Go near a hermit crab | It pulls back into its shell, then carries on, leaving tiny footprints |
 | Click right beside the dolphins | Startled, one leaps clear of the water and crashes back in with a burst of whitewater |
-| At night | Touching the water lights up glowing plankton; jellyfish and breaking surf glow. Now and then a nest of turtle hatchlings breaks open on the beach and they scramble down to the sea, leaving tiny tracks (they freeze if you sweep the cursor over them) |
+| At night | A path of moonlight glitters on the ripples out over the deep water. Touching the water lights up glowing plankton; jellyfish and breaking surf glow. Now and then a nest of turtle hatchlings breaks open on the beach and they scramble down to the sea, leaving tiny tracks (they freeze if you sweep the cursor over them) |
 | Nothing at all | Waves arrive in sets and at an angle: the swell slows and steepens in the shallows (focusing a bright band of light on the sand), breaks into whitewater, runs up the beach and drains back in streaks of foam, leaving a foam line at the top; wet sand darkens and the churned water clouds for a moment |
 
 ## Settings
@@ -124,7 +124,7 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 | 游標停著不動幾秒 | 好奇的小魚會慢慢游過來繞著游標 |
 | 靠近寄居蟹 | 牠會縮進殼裡，過幾秒才探出頭繼續爬，沿路留下小腳印 |
 | 在海豚旁邊點一下 | 受驚的海豚會躍出水面，再「啪」一聲濺起白浪落回水裡 |
-| 晚上 | 碰到海水的地方會亮起藍色螢光浮游生物；水母和浪花也會發光。偶爾沙灘上會有一窩小海龜孵化，一路爬向大海、留下小小的爬痕（游標掃過時牠們會停住不動） |
+| 晚上 | 深水區的海面上有一條閃爍的月光路。碰到海水的地方會亮起藍色螢光浮游生物；水母和浪花也會發光。偶爾沙灘上會有一窩小海龜孵化，一路爬向大海、留下小小的爬痕（游標掃過時牠們會停住不動） |
 | 什麼都不做 | 浪一組一組、斜斜地打進來：湧浪在淺水裡變慢變陡，碎成白浪沖上沙灘，再拖著泡沫條紋退回去，最高處留下一道泡沫線 |
 
 ### 設定

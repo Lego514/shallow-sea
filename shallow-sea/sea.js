@@ -1319,6 +1319,7 @@ uniform float u_caustic, u_glint, u_bio, u_cloud, u_exposure, u_refl;
 uniform int u_view;
 uniform vec2 u_cloudOff;
 uniform float u_tide, u_moon;
+uniform vec2 u_moonA, u_moonDir;
 ${NOISE}${SHORE}${SWASH}
 const float CR = 0.25;   // 1 - 1/n for water: how far a surface slope bends a near-vertical ray
 
@@ -1353,6 +1354,16 @@ float lace(vec2 q) {
   float n = gnoise(q) * 0.6 + gnoise(q * 2.03 + 7.1) * 0.28 + gnoise(q * 4.1 + 3.3) * 0.12;
   float r = 1.0 - min(abs(n) * 1.6, 1.0);
   return r * r;
+}
+
+// slopes of the tiny capillary ripples that ride on the waves (they make the glints twinkle)
+vec2 capillary(vec2 p) {
+  vec2 q = p * 260.0;
+  vec2 t1 = vec2(1.9, 0.7) * u_time, t2 = vec2(-1.2, 1.6) * u_time;
+  float c0 = gnoise(q + t1) + gnoise(q * 1.7 - t2);
+  float cx = gnoise(q + vec2(0.3, 0.0) + t1) + gnoise((q + vec2(0.3, 0.0)) * 1.7 - t2);
+  float cy = gnoise(q + vec2(0.0, 0.3) + t1) + gnoise((q + vec2(0.0, 0.3)) * 1.7 - t2);
+  return vec2(cx - c0, cy - c0) / 0.3 * 0.010;
 }
 
 void main() {
@@ -1469,15 +1480,23 @@ void main() {
   col = mix(col, u_skyCol * cl, clamp(fres * u_refl, 0.0, 1.0) * cover);
   col += u_skyCol * cl * 0.05 * wet * (1.0 - cover);           // sheen on wet sand
   if (u_glint > 0.001 && dot(n, u_glintH) > 0.9965) {
-    vec2 q = p * 260.0;
-    vec2 t1 = vec2(1.9, 0.7) * u_time, t2 = vec2(-1.2, 1.6) * u_time;
-    float c0 = gnoise(q + t1) + gnoise(q * 1.7 - t2);
-    float cx = gnoise(q + vec2(0.3, 0.0) + t1) + gnoise((q + vec2(0.3, 0.0)) * 1.7 - t2);
-    float cy = gnoise(q + vec2(0.0, 0.3) + t1) + gnoise((q + vec2(0.0, 0.3)) * 1.7 - t2);
-    vec2 gc = vec2(cx - c0, cy - c0) / 0.3 * 0.010;
-    vec3 n2 = normalize(vec3(-(g + gc), 1.0));
+    vec3 n2 = normalize(vec3(-(g + capillary(p)), 1.0));
     float gl = pow(max(dot(n2, u_glintH), 0.0), 5000.0);
     col += u_sunCol * gl * u_glint * 3.5 * cl * cover;
+  }
+  // night: a path of moonlight glittering on the ripples out over the deep water. Seen from a little way up, each
+  // point of the water mirrors the moon only where its slope is just right; that slope changes slowly along the
+  // path and quickly across it, so the glints gather into a long, narrow, twinkling band. Sparkles only, no haze
+  if (u_moon > 0.01 && cover > 0.01) {
+    vec2 dm = p - u_moonA, side = vec2(-u_moonDir.y, u_moonDir.x);
+    float al = dot(dm, u_moonDir), ac = dot(dm, side);
+    vec2 tilt = u_moonDir * al * 0.05 + side * ac * 0.8;
+    float env = exp(-ac * ac * 28.0);                               // thickest down the middle of the path
+    if (dot(tilt, tilt) < 0.03 && env > 0.02) {
+      vec2 sl = -(g + capillary(p)) - tilt;
+      float m = exp(-dot(sl, sl) * 14000.0);                      // sharp: pinpoints on the ripples, not patches
+      col += vec3(0.8, 0.86, 1.0) * m * env * u_moon * 2.8 * cover * smoothstep(0.08, 0.5, D0);
+    }
   }
 
   // surf: thick churned whitewater right behind a breaking wave, thinning into a web of foam as it ages;
@@ -1830,7 +1849,21 @@ function offscreenSeaPoint(minD, out) {
   }
   return [aspect + out, 0.3];
 }
+// the moon's reflection lies out over the deepest water and its path runs seaward, away from the beach
+let moonA = [0.8, 0.5], moonDir = [1, 0];
+function placeMoonPath() {
+  let sx = 0, sy = 0, sn = 0, dx = 0, dy = 0, dw = 0;
+  for (let i = 0; i < 24; i++) for (let j = 0; j < 15; j++) {
+    const x = (i + 0.5) / 24 * aspect, y = (j + 0.5) / 15, d = depthAt(x, y);
+    if (d > 0) { const w = d * d; dx += x * w; dy += y * w; dw += w; } else { sx += x; sy += y; sn++; }
+  }
+  const cx = dw ? dx / dw : aspect / 2, cy = dw ? dy / dw : 0.5;
+  let [vx, vy] = sn ? [cx - sx / sn, cy - sy / sn] : deeperDir(cx, cy);
+  const l = Math.hypot(vx, vy) || 1;
+  moonA = [cx, cy]; moonDir = [vx / l, vy / l];
+}
 function relocateCreatures() {
+  placeMoonPath();
   for (const f of fish) {
     if (depthAt(f.x, f.y) < (f.kind === 0 ? 0.1 : 0.2)) [f.x, f.y] = randomWaterPoint(0.3);
   }
@@ -3001,6 +3034,8 @@ function composite(L, dt) {
   gl.uniform1i(u.u_view, S.view);
   gl.uniform1f(u.u_tide, tideNow);
   gl.uniform1f(u.u_moon, L.bio);
+  gl.uniform2f(u.u_moonA, moonA[0], moonA[1]);
+  gl.uniform2f(u.u_moonDir, moonDir[0], moonDir[1]);
   drawTri();
 }
 
@@ -3269,6 +3304,7 @@ window.sea = { splash: (x, y) => splash(x * aspect, 1 - y, 1), regenerate, setti
   spawnDolphins: () => { spawnPod(); },
   leapDolphin: i => { const d = dolphins[i ?? 1] || dolphins[0]; if (d && !d.leap) startLeap(d); return !!d; },
   get sprays() { return sprays; },
+  get moonPath() { return { at: moonA, dir: moonDir }; },
   spawnNest: () => spawnNest(),
   get hatchlings() { return hatchlings; },
   get nest() { return nest; },
