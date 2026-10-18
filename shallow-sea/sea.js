@@ -583,7 +583,7 @@ void main() {
   else if (sp < 6.5) { ext = vec2(0.53, 1.15); off = vec2(-0.1, 0.0); }  // manta
   else if (sp < 7.5) ext = vec2(0.62, 0.62);                             // moon jelly
   else if (sp < 8.5) { ext = vec2(1.4, 0.66); off = vec2(-0.85, 0.0); } // sea nettle, tentacles trailing
-  else if (sp < 9.5) { ext = vec2(0.72, 0.8); off = vec2(0.06, 0.0); }  // sea turtle
+  else if (sp < 9.5) { ext = vec2(0.74, 0.88); off = vec2(0.06, 0.0); } // sea turtle
   else if (sp < 10.5) ext = vec2(0.62, 0.62);                            // hermit crab
   else if (sp < 11.5) { ext = vec2(0.66, 1.0); off = vec2(-0.08, 0.0); } // gull (only its shadow is drawn)
   else if (sp < 12.5) ext = vec2(0.62, 0.62);                            // a crumb of fish food
@@ -853,38 +853,105 @@ vec4 leaf(vec2 q, out float sha) {
   return vec4(col * a, a);
 }
 
-// green sea turtle: a plated shell, four flippers (the front pair rowing), a blunt head
-const vec2 SCUTE[9] = vec2[9](vec2(0.30, 0.0), vec2(0.13, 0.0), vec2(-0.04, 0.0), vec2(-0.21, 0.0), vec2(-0.35, 0.0),
-                              vec2(0.22, 0.22), vec2(0.05, 0.25), vec2(-0.12, 0.24), vec2(-0.28, 0.19));
-vec4 turtle(vec2 q, out float sha) {
-  float ph = v_b.y, aa = fwidth(q.x) + v_blur;
-  float ay = abs(q.y);
-  float fa = 0.25 + 0.6 * (0.5 + 0.5 * sin(ph));
-  vec2 fd = vec2(-sin(fa), cos(fa));
-  vec2 fq = vec2(q.x - 0.22, ay - 0.27);
-  float fl = dot(fq, fd), fc = dot(fq, vec2(fd.y, -fd.x));
-  float wF = 0.075 * (1.0 - 0.75 * clamp(fl / 0.5, 0.0, 1.0));
-  float flipF = smoothstep(aa, -aa, max(abs(fc + 0.16 * fl * fl) - wF, max(-fl, fl - 0.5)));
-  vec2 rq = vec2(q.x + 0.40, ay - 0.15);
-  float flipR = smoothstep(aa, -aa, (length(vec2(rq.x / 0.13, rq.y / 0.075)) - 1.0) * 0.075);
-  float head = smoothstep(aa, -aa, (length(vec2((q.x - 0.55) / 0.13, q.y / 0.10)) - 1.0) * 0.10);
-  float hw = 0.37 - 0.08 * max(-q.x, 0.0);
-  float dS = (length(vec2(q.x / 0.48, q.y / hw)) - 1.0) * hw;
-  float shell = smoothstep(aa, -aa, dS);
-  float skin = max(max(flipF, flipR), head);
-  vec3 sk = vec3(0.66, 0.62, 0.46) * (0.8 + 0.25 * smoothstep(0.2, 0.6, gnoise(q * 40.0)));
+// green sea turtle seen from above, in body lengths: the carapace runs from x = -0.46 to 0.42, the head to 0.68.
+// Carapace outline: a teardrop, widest a little ahead of the middle
+float turtleShellW(float x) {
+  float t = clamp((x + 0.46) / 0.88, 0.0, 1.0);
+  return 0.37 * sqrt(max(sin(3.14159265 * pow(t, 1.357)), 0.0));
+}
+// distance to the nearest border in a field of irregular scales, in cell units
+float scaleEdge(vec2 p) {
+  vec2 i = floor(p), f = p - i;
   float f1 = 9.0, f2 = 9.0;
-  vec2 nearest = vec2(0.0);
-  for (int k = 0; k < 9; k++) {
-    float d = length(vec2(q.x, ay) - SCUTE[k]);
-    if (d < f1) { f2 = f1; f1 = d; nearest = SCUTE[k]; } else if (d < f2) f2 = d;
+  for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+    vec2 g = vec2(float(x), float(y));
+    float d = length(g + hash22(i + g) * 0.8 + 0.1 - f);
+    if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) f2 = d;
   }
-  vec2 pc = vec2(q.x, ay) - nearest;
-  float streak = 0.5 + 0.5 * sin(atan(pc.y, pc.x) * 9.0 + length(pc) * 20.0);
-  vec3 shc = mix(v_c.rgb, vec3(0.72, 0.56, 0.30), 0.4 * streak * smoothstep(0.14, 0.0, f1));
-  shc *= 1.0 - 0.55 * smoothstep(0.012, 0.0, f2 - f1);
-  shc *= 1.0 - 0.35 * smoothstep(-0.05, 0.0, dS);
-  vec4 c = over(vec4(shc, 1.0) * shell, vec4(sk, 1.0) * skin);
+  return f2 - f1;
+}
+const vec2 HEADSC[7] = vec2[7](vec2(0.645, 0.0), vec2(0.605, 0.035), vec2(0.56, 0.0), vec2(0.52, 0.042),
+                               vec2(0.48, 0.0), vec2(0.475, 0.066), vec2(0.565, 0.072));
+vec4 turtle(vec2 q, out float sha) {
+  float ph = v_b.y, aa = fwidth(q.x) + v_blur, seed = v_c.w * 37.0;
+  float ay = abs(q.y);
+  vec2 qa = vec2(q.x, ay);
+
+  // ---- skin: front flippers (long curved paddles rowing together), rear flippers, neck, head, a stub of tail
+  float fa = mix(0.45, 1.7, 0.5 + 0.5 * sin(ph));
+  vec2 fd = vec2(-cos(fa), sin(fa)), fn = vec2(sin(fa), cos(fa));
+  vec2 rel = qa - vec2(0.2, 0.24);
+  float fl = dot(rel, fd), fc = dot(rel, fn) + 0.4 * fl * max(fl, 0.0);
+  float ft = clamp(fl / 0.55, 0.0, 1.0);
+  float pw = pow(max(sin(3.14159265 * min(1.0, 0.25 + 0.75 * ft)), 0.0), 0.7);
+  float wLead = 0.075 * pw + 0.004, wTrail = 0.048 * pw + 0.003;
+  float dF = max(fc > 0.0 ? fc - wLead : -fc - wTrail, max(-fl - 0.05, fl - 0.55));
+  float ra = 0.55 + 0.15 * sin(ph * 2.0 + 1.0);
+  vec2 rd = vec2(-cos(ra), sin(ra)), rn = vec2(sin(ra), cos(ra));
+  vec2 rr = qa - vec2(-0.36, 0.17);
+  float rl = dot(rr, rd), rc = dot(rr, rn), rt = clamp(rl / 0.24, 0.0, 1.0);
+  float dR = max(abs(rc + 0.01) - (0.06 * sqrt(max(1.0 - rt * rt, 0.0)) + 0.01 * (1.0 - rt)), max(-rl - 0.04, rl - 0.24));
+  float ry = 0.085 * (1.0 - 0.3 * smoothstep(0.52, 0.68, q.x));
+  float dH = (length(vec2((q.x - 0.55) / 0.125, q.y / ry)) - 1.0) * ry;
+  float dN = length(vec2(q.x - clamp(q.x, 0.34, 0.48), q.y)) - 0.065;
+  float dT = max(ay - 0.03 * clamp((q.x + 0.56) / 0.12, 0.0, 1.0), max(q.x + 0.4, -0.56 - q.x));
+  float dSkin = min(min(dF, dR), min(min(dH, dN), dT));
+  float skin = smoothstep(aa, -aa, dSkin);
+  // dark scales with pale borders: big ones on the flippers, a symmetric set of plates on the head, small on the neck
+  vec2 pF = vec2(fl, fc) / 0.045 + seed, pG = qa / 0.028 + seed;
+  float eF = scaleEdge(pF), eG = scaleEdge(pG);
+  float h1 = 9.0, h2 = 9.0;
+  for (int k = 0; k < 7; k++) {
+    float d = length(qa - HEADSC[k]);
+    if (d < h1) { h2 = h1; h1 = d; } else if (d < h2) h2 = d;
+  }
+  float eH = (h2 - h1) / 0.035;
+  float fwF = fwidth(pF.x), fwG = fwidth(pG.x), fwH = fwidth(q.x / 0.035);
+  float onHead = step(dH, 0.0), onFlip = step(dF, 0.0) * (1.0 - onHead);
+  float e = mix(mix(eG, eF, onFlip), eH, onHead), fw = mix(mix(fwG, fwF, onFlip), fwH, onHead);
+  float border = mix(1.0 - smoothstep(0.02, 0.09, e), 0.25, smoothstep(0.25, 0.6, fw));     // blur out when tiny
+  vec3 kc = mix(vec3(0.3, 0.25, 0.17), vec3(0.66, 0.6, 0.43), border);
+  kc = mix(kc, vec3(0.62, 0.58, 0.44), smoothstep(-0.55, -0.95, fc / wTrail) * onFlip * 0.6);
+  kc *= 0.8 + 0.2 * smoothstep(0.0, -0.025, dSkin);                                           // rounded edges
+  kc = mix(kc, vec3(0.12, 0.1, 0.08), smoothstep(0.013, 0.007, length(vec2(fl - 0.17, fc - 0.05))) * onFlip);  // claw
+  kc = mix(kc, vec3(0.06), smoothstep(0.016, 0.009, length(vec2((q.x - 0.565) / 1.4, ay - 0.074))) * smoothstep(0.02, -0.01, dH));  // eyes
+
+  // ---- carapace
+  float hw = turtleShellW(q.x);
+  float slope = (turtleShellW(q.x + 0.005) - turtleShellW(q.x - 0.005)) / 0.01;
+  float dS = max((ay - hw) / sqrt(1.0 + slope * slope), max(q.x - 0.42, -0.46 - q.x));
+  float shell = smoothstep(aa, -aa, dS);
+  float rim = smoothstep(-0.058, -0.052, dS);                       // the ring of small marginal plates
+  float ang = atan(q.y / 0.37, (q.x + 0.02) / 0.44), seg = ang * 24.0 / 6.2831853;
+  float dMs = (0.5 - abs(fract(seg) - 0.5)) * 6.2831853 / 24.0 * 0.4;
+  float dMi = abs(dS + 0.055);
+  // five vertebral plates down the spine (six-sided), four costal plates either side, their seams slanting back
+  float vu = (0.33 - q.x) / 0.152, vk = floor(vu), vf = vu - vk;
+  float inRow = step(0.0, vu) * step(vu, 5.0);
+  float vb = 0.085 + 0.04 * (1.0 - abs(2.0 * vf - 1.0));
+  float inV = step(ay, vb) * inRow;
+  float dVb = mix(9.0, abs(ay - vb), inRow), dVs = (0.5 - abs(fract(vu + 0.5) - 0.5)) * 0.152;
+  float cpos = q.x + 0.3 * (ay - 0.1);
+  float dCs = min(min(abs(cpos - 0.16), abs(cpos + 0.02)), abs(cpos + 0.2)) / 1.044;
+  float dSeam = mix(mix(min(dVb, dCs), min(dVb, dVs), inV), min(dMs, dMi), rim);
+  float sw = max(0.0035, aa * 0.8);
+  float seam = smoothstep(sw * 1.6, sw * 0.5, min(dSeam, dMi));
+  // each plate grows outward from a point near its back edge, leaving a sunburst of light and dark streaks
+  float ck = cpos > 0.16 ? 0.27 : cpos > -0.02 ? 0.07 : cpos > -0.2 ? -0.11 : -0.31;
+  vec2 gc = inV > 0.5 ? vec2(0.33 - (vk + 0.72) * 0.152, 0.0) : vec2(ck - 0.063, 0.21);
+  vec2 rg = qa - gc;
+  float burst = sin(atan(rg.y, rg.x) * 5.0 + 3.5 * gnoise(qa * 5.0 + seed) + length(rg) * 8.0) + 0.5 * gnoise(qa * 11.0 - seed);
+  burst = mix(burst, sin(seg * 6.2831853 * 2.0 + 2.5 * gnoise(qa * 8.0 + seed)), rim * 0.7);
+  float lightS = smoothstep(-0.4, 1.0, burst) * mix(smoothstep(0.0, 0.05, length(rg)), 1.0, rim);
+  vec3 base = v_c.rgb;
+  vec3 sc = mix(base * vec3(0.72, 0.7, 0.66), base * vec3(1.3, 1.28, 1.15) + vec3(0.05, 0.04, 0.0), lightS * 0.6);
+  sc = mix(sc, base * 0.5, smoothstep(0.1, 0.6, gnoise(qa * 3.5 + seed * 1.3)) * 0.4);        // darker blotches
+  float nzS = sqrt(max(1.0 - pow(ay / max(hw, 0.05), 2.0), 0.0));
+  sc *= 0.7 + 0.4 * nzS;                                                                        // domed
+  sc = mix(sc, vec3(0.6, 0.56, 0.44) * (0.7 + 0.4 * nzS), seam * 0.4 * smoothstep(0.014, 0.005, aa));   // pale seams, fading when small
+  sc += vec3(0.25) * smoothstep(0.15, 0.03, v_b.w) * pow(nzS, 6.0) * 0.5;                     // wet sheen near the surface
+
+  vec4 c = over(vec4(sc, 1.0) * shell, vec4(kc, 1.0) * skin);
   sha = max(shell, skin) * 0.9;
   return c;
 }
