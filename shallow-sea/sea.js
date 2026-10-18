@@ -925,60 +925,81 @@ vec4 pellet(vec2 q, out float sha) {
   return vec4(c * a, a);
 }
 
-// bottlenose dolphin from above: a grey streamlined body, rounded melon and short beak, swept-back flippers,
-// the dorsal fin as a dark ridge, and horizontal flukes that shorten and lengthen as they beat up and down
+// bottlenose dolphin seen from above, in body lengths: beak tip at x = 0.5, fluke tips near x = -0.52.
+// Half-width of the body: a blunt rounded head, widest just behind the flippers, a long taper into the tail stock
+float dolphinW(float x) {
+  float t = clamp((x + 0.42) / 0.85, 0.0, 1.0);
+  float sn = max(sin(3.14159265 * pow(t, 1.413)), 0.0);
+  return 0.022 + 0.078 * pow(sn, mix(0.9, 0.6, smoothstep(0.3, 0.7, t)));
+}
+float sminD(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
 vec4 dolphin(vec2 q, out float sha) {
-  float ph = v_b.y, bend = v_b.z, mode = v_c.w, aa = fwidth(q.x) + v_blur, cut = 0.0;
+  float ph = v_b.y, bend = v_b.z, mode = v_c.w, aa = fwidth(q.x) + v_blur, cut = 0.0, roll = 0.0;
   if (mode > 1.5) {
     // leaping: pitched nose-up then nose-down, so from above the body looks shorter; y.phase holds the waterline
     // (in body lengths along the body) and z.bend how much the length is foreshortened
     cut = ph; q.x /= bend; aa /= bend; ph = 0.0; bend = 0.0;
+  } else if (mode > 0.0) {
+    roll = ph; ph = 0.0;          // breathing: y.phase says which stretch of the back is out of the water
   }
   q.y -= bend * 0.4 * (q.x - 0.2) * (q.x - 0.2);
   float ay = abs(q.y);
-  // body: a rounded head, widest a third of the way back, then a long taper into a slim tail stock
-  const float W = 0.085, XM = 0.12, XH = 0.44, XT = -0.47, WP = 0.02;
-  float uf = clamp((q.x - XM) / (XH - XM), 0.0, 1.0), ur = clamp((XM - q.x) / (XM - XT), 0.0, 1.0);
-  float w = q.x > XM ? W * pow(1.0 - pow(uf, 2.2), 0.6) : mix(W, WP, pow(ur, 1.6));
-  float body = smoothstep(aa, -aa, max(ay - w, max(q.x - XH, XT - q.x)));
-  // short beak in front of the melon
-  vec2 bq = vec2(q.x - clamp(q.x, 0.40, 0.505), q.y);
-  float beak = smoothstep(aa, -aa, length(bq) - 0.019);
-  // flukes: two lobes swept back from the tail; they look shorter as they beat up and down
-  float sp = ay / 0.15;
-  float le = XT + 0.015 - 0.10 * sp * sp;
-  float chord = (0.075 * sqrt(max(1.0 - sp * sp, 0.0)) + 0.004) * (0.6 + 0.4 * abs(cos(ph))) * smoothstep(0.0, 0.12, sp + 0.03);
-  float flukes = smoothstep(aa, -aa, max(max(q.x - le, le - chord - q.x), ay - 0.15));
-  // flippers, swept back from just behind the head
-  vec2 pq = vec2(q.x - 0.19, ay - 0.07);
-  vec2 fd = vec2(-0.55, 0.835);
-  float along = dot(pq, fd), across = dot(pq, vec2(-fd.y, fd.x));
-  float flip = smoothstep(aa, -aa, (length(vec2((along - 0.05) / 0.065, across / 0.02)) - 1.0) * 0.02);
-  float a = max(max(body, beak), max(flukes, flip));
-  // dark grey cape along the back, paler flanks; fins and beak a shade darker
-  vec3 back = v_c.rgb, flank = back * 1.45 + vec3(0.03, 0.04, 0.05);
-  float side = smoothstep(0.35, 1.0, ay / max(w, 0.015));
-  vec3 c = mix(back, flank, side * body);
-  c = mix(c, back * 0.75, max(max(flukes, flip), beak) * (1.0 - body));
-  float fin = smoothstep(0.012, 0.004, ay - 0.004 * smoothstep(0.1, -0.06, q.x)) * smoothstep(-0.09, -0.05, q.x) * smoothstep(0.12, 0.08, q.x);
-  c = mix(c, back * 0.5, fin);                                                                     // dorsal fin
-  c = mix(c, back * 0.6, smoothstep(0.004, 0.0, abs(q.x - 0.40)) * step(ay, 0.03) * body);        // crease where melon meets beak
-  c = mix(c, back * 0.45, smoothstep(0.011, 0.006, length(vec2(q.x - 0.29, q.y))));                // blowhole
-  c = mix(c, vec3(0.04), smoothstep(0.009, 0.005, length(vec2(q.x - 0.37, ay - 0.04))));          // eyes
-  // wet skin catching the light when it breaks the surface
-  float wet = smoothstep(0.12, 0.02, v_b.w), yw = q.y / max(w, 0.015);
-  c += vec3(0.32, 0.35, 0.38) * wet * exp(-pow((yw - 0.3) / 0.18, 2.0)) * body * smoothstep(-0.3, 0.1, q.x);
+  // body and beak, blended so the melon flows into the short stout rostrum
+  float w = dolphinW(q.x);
+  float dBody = max(ay - w, max(q.x - 0.43, -0.42 - q.x));
+  float bx = clamp(q.x, 0.39, 0.488);
+  float dBeak = length(vec2(q.x - bx, q.y)) - mix(0.026, 0.017, (bx - 0.39) / 0.098);
+  float dTrunk = sminD(dBody, dBeak, 0.012);
+  // flippers: swept back from just behind the head, curving to a point
+  vec2 rel = vec2(q.x, ay) - vec2(0.21, 0.065);
+  float al = dot(rel, vec2(-0.83, 0.56)), ac = dot(rel, vec2(0.56, 0.83)) + 0.8 * al * max(al, 0.0);
+  float fw = 0.028 * pow(clamp(1.0 - al / 0.125, 0.0, 1.0), 0.45);
+  float dFlip = max(abs(ac) - fw, -al - 0.02);
+  // flukes: two swept, pointed lobes with a notch between; they look shorter as they beat up and down
+  float sp = ay / 0.135;
+  float xle = -0.405 - 0.095 * pow(min(sp, 1.0), 1.7);
+  float ch = (0.072 * pow(max(1.0 - sp * sp, 0.0), 0.65) + 0.004) * (0.65 + 0.35 * abs(cos(ph))) - 0.014 * max(1.0 - sp / 0.1, 0.0);
+  float dFluke = max(max(q.x - xle, xle - ch - q.x), (sp - 1.0) * 0.135);
+  float d = sminD(sminD(dTrunk, dFlip, 0.012), dFluke, 0.018);
+  float a = smoothstep(aa, -aa, d);
+  float trunk = smoothstep(aa, -aa, dTrunk);
+  // colour: a dark grey cape along the spine, paler flanks, rounded by the light falling on a cylinder
+  vec3 back = v_c.rgb, flank = back * 1.6 + vec3(0.05, 0.055, 0.06);
+  float wx = max(dolphinW(clamp(q.x, -0.42, 0.43)), 0.02);
+  float yw = clamp(q.y / wx, -1.0, 1.0), nz = sqrt(max(1.0 - yw * yw, 0.0));
+  vec3 c = mix(back, flank, smoothstep(0.4, 0.95, abs(yw)) * trunk);
+  float cape = smoothstep(0.7, 0.2, abs(yw)) * smoothstep(-0.32, -0.05, q.x) * smoothstep(0.43, 0.3, q.x);
+  c *= (1.0 - 0.2 * cape) * mix(0.82, 0.68 + 0.4 * nz, trunk);
+  c = mix(c, back * 0.92, (1.0 - trunk) * a);                                                          // fins a shade darker
+  // dorsal fin: a thin sickle seen edge-on, leaning back over the body, with a soft shadow at its foot
+  float ft = clamp((q.x + 0.07) / 0.18, 0.0, 1.0), inFin = smoothstep(-0.085, -0.06, q.x) * smoothstep(0.125, 0.1, q.x);
+  float fwid = 0.0025 + 0.006 * smoothstep(0.0, 0.7, ft) * (1.0 - smoothstep(0.85, 1.0, ft));
+  c *= 1.0 - 0.12 * smoothstep(0.016, 0.0, ay - fwid) * inFin;
+  c = mix(c, back * 0.6, smoothstep(aa, -aa, ay - fwid) * inFin);
+  // blowhole, and the crease where the melon meets the beak
+  c *= 1.0 - 0.45 * smoothstep(0.0035, 0.0, abs(length(q - vec2(0.322, 0.0)) - 0.012)) * step(q.x, 0.322) * step(ay, 0.011);
+  c *= 1.0 - 0.22 * smoothstep(0.007, 0.0, abs(q.x - 0.418 + 10.0 * q.y * q.y)) * step(ay, 0.034);
+  // wet skin catches the light along the spine, strongly when it breaks the surface
+  float wet = mix(0.06, 0.3, smoothstep(0.12, 0.02, v_b.w));
+  c += vec3(0.85, 0.9, 0.95) * wet * exp(-pow((yw - 0.3) / 0.12, 2.0)) * trunk * smoothstep(-0.35, 0.0, q.x) * smoothstep(0.42, 0.3, q.x);
   if (mode > 1.5) {
     // 2 and 3: the part above the water while it leaves (head first) and comes back (head first again);
     // 4 and 5: the part still under water, drawn in the fish layer
     float keep = (mode < 2.5 || mode > 4.5) ? q.x - cut : cut - q.x;
     a *= smoothstep(-0.008, 0.008, keep);
-    if (mode < 3.5) c = mix(c, vec3(0.80, 0.88, 0.92), smoothstep(0.07, 0.0, keep) * 0.6);         // water pouring off at the surface
+    if (mode < 3.5) c = mix(c, vec3(0.80, 0.88, 0.92), smoothstep(0.06, 0.0, keep) * 0.5);         // water pouring off at the surface
   } else if (mode > 0.0) {
-    // drawn a second time on the surface layer while breathing: only the back that breaks the water, crisp and wet
-    float r = length(vec2((q.x - 0.12) / 0.24, ay / (0.75 * max(w, 0.01)))), fr = fwidth(r);
-    a *= smoothstep(1.0 + fr, 1.0 - fr, r) * v_c.w;
-    c = mix(c, vec3(0.75, 0.84, 0.88), smoothstep(0.82, 1.0, r) * 0.3);                           // water sheeting off at the waterline
+    // breathing: the head, then the back and dorsal fin, then the tail stock roll up through the surface;
+    // only the top of the back is clear of the water, with a film of water along the waterline
+    // a hump of back rolls through the surface: head first, then the back and fin, then the tail stock.
+    // Where the skin is higher than the water it is out, crisp and wet; a thin sheet of water runs off around it
+    float hump = 0.55 * exp(-pow((q.x - roll) / 0.22, 2.0)) - 0.12;
+    float up = smoothstep(-0.06, 0.12, hump - 1.6 * yw * yw) * trunk;
+    up = max(up, smoothstep(aa, -aa, ay - fwid) * inFin * smoothstep(-0.2, -0.05, hump));      // the fin stands clear
+    a = up * mode;
   }
   sha = a * 0.9;
   return vec4(c * a, a);
@@ -2176,9 +2197,9 @@ function spawnPod() {
     const ox = -0.12 * Math.ceil(i / 2) - rand(0, 0.05), oy = i === 0 ? 0 : (i % 2 ? 1 : -1) * (0.08 + 0.04 * Math.ceil(i / 2)) + rand(-0.02, 0.02);
     const c = Math.cos(ang), s = Math.sin(ang), g = rand(-0.03, 0.03);
     dolphins.push({ lead: i === 0, ox, oy, tx: ex, ty: ey, x: sx + c * ox - s * oy, y: sy + s * ox + c * oy, ang,
-                    vx: c * 0.11, vy: s * 0.11, angVel: 0, bend: 0, len: calf ? rand(0.15, 0.17) : rand(0.22, 0.27),
+                    vx: c * 0.11, vy: s * 0.11, angVel: 0, bend: 0, len: calf ? rand(0.13, 0.15) : rand(0.2, 0.24),
                     phase: rand(0, TAU), beat: rand(0.9, 1.2), breath: rand(0, 1), breathRate: rand(1 / 9, 1 / 6),
-                    blown: false, depth: 0.2, fear: 0, leap: null, col: [0.19 + g, 0.22 + g, 0.26 + g] });
+                    blown: false, depth: 0.2, fear: 0, leap: null, col: [0.18 + g, 0.2 + g, 0.23 + g] });
   }
   podAge = 0;
 }
@@ -2239,6 +2260,8 @@ function updateDolphins(dt) {
       }
       if (onScreen) {
         addDrop(hx, hy, hx, hy, 0.022, -0.35 * S.ripple);
+        const bx = d.x + Math.cos(d.ang) * d.len * 0.3, by = d.y + Math.sin(d.ang) * d.len * 0.3;
+        addSpray(bx, by, d.len * 0.11, 0.45, 0.7);
         if (S.sound && audio.ctx && audio.ctx.state === 'running') hiss(audio.ctx.currentTime, 'bandpass', 1300, 0.8, 0.02, 0.35, 0.07);
       }
     }
@@ -2462,7 +2485,10 @@ function packInstances() {
   for (const d of dolphins) {
     const l = d.leap && d.leap.draw;
     if (l) put(d.x, d.y, d.ang, d.len * l.sc, 13, l.cut, l.fs, 0, d.col, l.mode);
-    else if (d.depth < 0.06) put(d.x, d.y, d.ang, d.len, 13, d.phase, d.bend, 0, d.col, Math.min(1, (0.06 - d.depth) / 0.04));
+    else if (d.depth < 0.06) {
+      const roll = Math.max(-1, Math.min(1, (d.breath - 0.25) / 0.05));
+      put(d.x, d.y, d.ang, d.len, 13, 0.16 - 0.24 * roll, d.bend, 0, d.col, Math.min(1, (0.06 - d.depth) / 0.04));
+    }
   }
   floatBatch.count = n;
   n = 0;
@@ -2900,6 +2926,7 @@ window.wallpaperPropertyListener = {
 window.sea = { splash: (x, y) => splash(x * aspect, 1 - y, 1), regenerate, settings: S, get seed() { return seed; }, get rays() { return rays; }, get jellies() { return jellies; }, get crabs() { return crabs; }, get gulls() { return gulls; },
   spawnGulls: () => { gullTimer = 0; }, audio,
   setSeedWord: w => { seedWord = w; },
+  depthAt: (x, y) => depthAt(x, y),
   // render one frame of exactly dt seconds right now, without waiting for the browser (works in a hidden tab)
   stepFrame: dt => { stepping = true; if (floorDirty) renderFloor(); step(dt); return new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9)); },
   get floorBuilds() { return floorBuilds; },
