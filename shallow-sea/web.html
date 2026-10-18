@@ -26,7 +26,7 @@
   #msg {
     position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center;
     padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px));
-    color: var(--ink); font-size: 15px; line-height: 1.6;
+    color: var(--ink); font-size: 15px; line-height: 1.6; white-space: pre-line;
   }
   #stats {
     position: fixed; left: 8px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); display: none;
@@ -176,6 +176,136 @@
         seedPlaceholder: n => `Now ${n} (leave empty for a new one each time)`,
       },
     };
+    // the Chinese words (LivelyProperties.json itself is bilingual for Lively's panel)
+    const ZH = {
+      "labelScene": {
+        "value": "場景"
+      },
+      "timeOfDay": {
+        "text": "時段",
+        "help": "自動會跟著系統時鐘變化，晚上有螢光浮游生物",
+        "items": [
+          "自動（依系統時間）",
+          "早晨",
+          "正午",
+          "黃昏",
+          "夜晚"
+        ]
+      },
+      "shore": {
+        "text": "沙灘位置",
+        "help": "在沙灘上按住滑鼠拖曳可以在沙上寫字，浪打上來會把字抹掉",
+        "items": [
+          "左上角",
+          "上方",
+          "右上角",
+          "左側",
+          "右側",
+          "下方",
+          "沒有沙灘（整片淺海）"
+        ]
+      },
+      "waterColor": {
+        "text": "淺水顏色"
+      },
+      "deepColor": {
+        "text": "深海顏色"
+      },
+      "newSeabed": {
+        "text": "重新產生海床",
+        "value": "換一片"
+      },
+      "showSeabed": {
+        "text": "顯示目前海床編號",
+        "value": "顯示"
+      },
+      "seabedNumber": {
+        "text": "固定海床編號",
+        "help": "喜歡現在這片海床？按上面的「顯示」，把右上角出現的數字填進來，以後開機都會是這片。留空＝每次隨機"
+      },
+      "tide": {
+        "text": "潮汐",
+        "help": "照真實時間大約每 12.4 小時漲退一次"
+      },
+      "labelWater": {
+        "value": "水面"
+      },
+      "causticStrength": {
+        "text": "光紋強度"
+      },
+      "waveStrength": {
+        "text": "波浪大小"
+      },
+      "waveSpeed": {
+        "text": "波浪速度"
+      },
+      "rippleStrength": {
+        "text": "滑鼠漣漪強度"
+      },
+      "rain": {
+        "text": "雨"
+      },
+      "clouds": {
+        "text": "雲影"
+      },
+      "labelLife": {
+        "value": "生物"
+      },
+      "fishCount": {
+        "text": "小魚數量"
+      },
+      "bigFish": {
+        "text": "大魚"
+      },
+      "rays": {
+        "text": "魟魚",
+        "help": "藍點魟趴在沙上，斑點鷹魟和鬼蝠魟在水中拍翅膀游"
+      },
+      "turtle": {
+        "text": "海龜",
+        "help": "偶爾從深水游過來，不時浮上水面換氣"
+      },
+      "beachLife": {
+        "text": "寄居蟹與海鷗",
+        "help": "寄居蟹在沙灘上爬、留下腳印，靠近會縮進殼裡；海鷗只看得到影子"
+      },
+      "jellyCount": {
+        "text": "水母數量"
+      },
+      "floatCount": {
+        "text": "漂浮的花與葉"
+      },
+      "labelSound": {
+        "value": "聲音"
+      },
+      "sound": {
+        "text": "海浪聲",
+        "help": "跟畫面同步的浪聲；Lively 的音量設定也會影響"
+      },
+      "volume": {
+        "text": "音量"
+      },
+      "labelPerf": {
+        "value": "效能"
+      },
+      "quality": {
+        "text": "畫質",
+        "help": "顯示卡較弱或 4K 螢幕可調低",
+        "items": [
+          "高（原生解析度）",
+          "中（75%）",
+          "低（50%）"
+        ]
+      },
+      "idleSave": {
+        "text": "閒置時省電",
+        "help": "滑鼠 45 秒沒動就降到 30 FPS，一動馬上恢復"
+      },
+      "fps30": {
+        "text": "鎖定 30 FPS",
+        "help": "降低耗電"
+      }
+    };
     // help text that only makes sense inside Lively, reworded for the web
     const WEB_ZH = {
       sound: { help: '跟畫面同步的浪聲；點一下水面也會有聲音' },
@@ -257,7 +387,7 @@
     // a property's words in the current language
     const words = (key, p) => {
       if (lang === 'en') return { ...p, ...(EN[key] || {}) };
-      return { ...p, ...(WEB_ZH[key] || {}) };
+      return { ...p, ...(ZH[key] || {}), ...(WEB_ZH[key] || {}) };
     };
 
     let props = null;

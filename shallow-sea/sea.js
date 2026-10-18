@@ -31,8 +31,8 @@ const gl = canvas.getContext('webgl2', {
   alpha: false, antialias: false, depth: false, stencil: false,
   premultipliedAlpha: false, powerPreference: 'high-performance',
 });
-if (!gl) { fail('這個桌布需要 WebGL2。'); return; }
-if (!gl.getExtension('EXT_color_buffer_float')) { fail('顯示卡不支援浮點渲染（EXT_color_buffer_float）。'); return; }
+if (!gl) { fail('This wallpaper needs WebGL2, which this browser or graphics driver doesn’t provide.\n這個桌布需要 WebGL2，但這個瀏覽器或顯示卡驅動不支援。'); return; }
+if (!gl.getExtension('EXT_color_buffer_float')) { fail('Your graphics card can’t render to floating-point textures (EXT_color_buffer_float).\n顯示卡不支援浮點渲染（EXT_color_buffer_float）。'); return; }
 
 // ---------------------------------------------------------------- settings
 const S = {
@@ -59,6 +59,7 @@ const S = {
   quality: 0,
   fps30: false,
   idleSave: true,              // drop to 30 FPS when nobody has touched the wallpaper for a while
+  fpsLimit: 0,                 // Wallpaper Engine's frame-rate limit (0 = none)
   glint: 0.16,
   exposure: 0.85,
   view: +(Q.get('view') || 0),
@@ -1250,7 +1251,7 @@ try {
   sandP = program(FULLSCREEN_VS, SAND_FS);
   coastP = program(FULLSCREEN_VS, COAST_FS);
 } catch (e) {
-  fail('著色器編譯失敗：' + e.message);
+  fail('A shader failed to compile: ' + e.message + '\n著色器編譯失敗。');
   return;
 }
 
@@ -1334,6 +1335,15 @@ makeWorld();
 
 // ---------------------------------------------------------------- render targets
 let W = 0, H = 0, aspect = 16 / 9;
+// Building the seabed is the slow part of starting up. Lively sends every saved setting one by one right
+// after the page loads, and several of them would rebuild it, so requests are gathered and served once.
+const startedAt = performance.now();
+let floorDirty = true, floorDueAt = 0, floorReady = false, floorBuilds = 0;
+function requestFloor() {
+  floorDirty = true;
+  const booting = performance.now() - startedAt < 4000;
+  floorDueAt = performance.now() + (booting ? 250 : 0);
+}
 let floorT, coastT, shadowT, deepT, fishT, floatT, simA, simB, sandA, sandB, simW = 0, simH = 0;
 
 function resize(force) {
@@ -1356,10 +1366,14 @@ function resize(force) {
   simH = q.sim; simW = Math.round(simH * aspect);
   simA = rgba16f(simW, simH);
   simB = rgba16f(simW, simH);
-  renderFloor();
+  floorReady = false;
+  requestFloor();
 }
 
 function renderFloor() {
+  floorDirty = false;
+  floorReady = true;
+  floorBuilds++;
   gl.bindFramebuffer(gl.FRAMEBUFFER, floorT.fbo);
   gl.viewport(0, 0, W, H);
   gl.disable(gl.BLEND);
@@ -2349,7 +2363,7 @@ seedTag.id = 'seedTag';
 seedTag.style.cssText = 'position:fixed;top:24px;right:24px;padding:8px 14px;border-radius:8px;background:rgba(3,28,36,.6);' +
   'color:#eaf7f5;font:16px/1.4 "Microsoft JhengHei",system-ui,sans-serif;letter-spacing:.04em;opacity:0;transition:opacity .6s;pointer-events:none';
 document.body.appendChild(seedTag);
-let seedTagTimer = 0, seedWord = '海床編號';
+let seedTagTimer = 0, seedWord = 'Seabed No. 海床編號';
 function showSeed() {
   seedTag.textContent = `${seedWord} ${seed}`;
   seedTag.style.opacity = '1';
@@ -2358,18 +2372,23 @@ function showSeed() {
 }
 
 let stepping = false;               // test hook: the clock only moves when a frame is asked for (recording)
+let paused = false;                 // Wallpaper Engine tells us when it pauses the wallpaper
 const IDLE_AFTER = 45;              // seconds without the mouse before the wallpaper slows to 30 FPS
 
 // whether the loop should draw at this timestamp: full speed, or 30 FPS when locked or idle
 function wantsFrame(now) {
-  if (stepping) return false;
+  if (stepping || paused) return false;
   const idle = S.idleSave && time - mouse.lastMove > IDLE_AFTER && !mouse.down;
-  return !((S.fps30 || idle) && now - lastDraw < 1000 / 30 - 3);
+  let cap = S.fpsLimit > 0 ? S.fpsLimit : 0;              // Wallpaper Engine's frame-rate setting
+  if (S.fps30 || idle) cap = cap ? Math.min(cap, 30) : 30;
+  return !cap || now - lastDraw >= 1000 / cap - 3;
 }
 
 function frame(now) {
   requestAnimationFrame(frame);
-  if (!wantsFrame(now)) { if (stepping) last = now; return; }
+  if (floorDirty && now >= floorDueAt) renderFloor();
+  if (!floorReady) { last = now; return; }        // nothing to show until the seabed exists
+  if (!wantsFrame(now)) { if (stepping || paused) last = now; return; }
   lastDraw = now;
   const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000));
   last = now;
@@ -2407,7 +2426,7 @@ function step(dt) {
 function regenerate() {
   seed = (Math.random() * 2 ** 31) | 0;
   makeWorld();
-  renderFloor();
+  requestFloor();
   showSeed();
 }
 
@@ -2418,7 +2437,7 @@ const PROPS = {
   timeOfDay: v => { S.timeMode = v | 0; },
   waterColor: v => { S.water = hexToRgb(v); },
   deepColor: v => { S.deep = hexToRgb(v); },
-  shore: v => { S.shore = v | 0; renderFloor(); },
+  shore: v => { if ((v | 0) === S.shore) return; S.shore = v | 0; requestFloor(); },
   causticStrength: v => { S.caustic = v / 100; },
   waveStrength: v => { S.waves = v / 100; },
   waveSpeed: v => { S.speed = v / 100; },
@@ -2430,22 +2449,24 @@ const PROPS = {
   floatCount: v => { S.floats = v | 0; syncFloats(); },
   rain: v => { S.rain = v / 100; },
   clouds: v => { S.clouds = v / 100; },
-  quality: v => { S.quality = v | 0; resize(true); },
+  quality: v => { if ((v | 0) === S.quality) return; S.quality = v | 0; resize(true); },
   fps30: v => { S.fps30 = v === true || v === 'true'; },
   idleSave: v => { S.idleSave = v === true || v === 'true'; },
   newSeabed: () => { if (performance.now() - bootAt > 3000) regenerate(); },
   showSeabed: () => { if (performance.now() - bootAt > 3000) showSeed(); },
   seabedNumber: v => {
-    // Lively sends every keypress: wait until the typing stops
-    clearTimeout(seedInputTimer);
-    seedInputTimer = setTimeout(() => {
+    const use = () => {
       const m = /^\s*(\d{1,10})\s*$/.exec(String(v ?? ''));
       if (!m || (+m[1] | 0) === seed) return;
       seed = +m[1] | 0;
       makeWorld();
-      renderFloor();
+      requestFloor();
       if (performance.now() - bootAt > 3000) showSeed();
-    }, 700);
+    };
+    // a saved number arrives once at startup: use it straight away, before the first seabed is built;
+    // later Lively sends every keypress, so wait until the typing stops
+    clearTimeout(seedInputTimer);
+    if (!floorReady) use(); else seedInputTimer = setTimeout(use, 700);
   },
   tide: v => { S.tide = v === true || v === 'true'; },
   turtle: v => { S.turtle = v === true || v === 'true'; syncRays(); },
@@ -2458,12 +2479,36 @@ window.livelyPropertyListener = (name, val) => {
   if (f) try { f(val); } catch (e) { console.error(e); }
 };
 
+// Wallpaper Engine: the same settings arrive here. Its keys are the names above in lower case (it allows only
+// letters and digits), colours come as "r g b" from 0 to 1, and dropdown values as strings. It has no buttons,
+// so "new seabed" and "show seabed number" are switches that act each time they are flipped.
+const PROP_BY_KEY = Object.fromEntries(Object.keys(PROPS).map(k => [k.toLowerCase(), k]));
+const RGB_FLOATS = /^\s*[\d.]+\s+[\d.]+\s+[\d.]+\s*$/;
+const toHex = v => '#' + String(v).trim().split(/\s+/).slice(0, 3)
+  .map(c => Math.round(Math.min(1, Math.max(0, +c)) * 255).toString(16).padStart(2, '0')).join('');
+window.wallpaperPropertyListener = {
+  applyUserProperties(props) {
+    for (const [key, p] of Object.entries(props || {})) {
+      const name = PROP_BY_KEY[key.toLowerCase()];
+      if (!name || !p || !('value' in p)) continue;
+      const v = (p.type === 'color' || (name.endsWith('Color') && RGB_FLOATS.test(String(p.value)))) ? toHex(p.value) : p.value;
+      window.livelyPropertyListener(name, v);
+    }
+  },
+  applyGeneralProperties(props) {
+    if (props && props.fps) S.fpsLimit = +props.fps.value || 0;
+  },
+  setPaused(isPaused) { paused = !!isPaused; },
+};
+
 // hooks for testing from the console
 window.sea = { splash: (x, y) => splash(x * aspect, 1 - y, 1), regenerate, settings: S, get seed() { return seed; }, get rays() { return rays; }, get jellies() { return jellies; }, get crabs() { return crabs; }, get gulls() { return gulls; },
   spawnGulls: () => { gullTimer = 0; }, audio,
   setSeedWord: w => { seedWord = w; },
   // render one frame of exactly dt seconds right now, without waiting for the browser (works in a hidden tab)
-  stepFrame: dt => { stepping = true; step(dt); return new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9)); },
+  stepFrame: dt => { stepping = true; if (floorDirty) renderFloor(); step(dt); return new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9)); },
+  get floorBuilds() { return floorBuilds; },
+  get paused() { return paused; },
   stopStepping: () => { stepping = false; },
   // drive the real loop with a made-up timestamp; true if it drew (lets the frame-rate cap be tested in a hidden tab)
   driveFrame: now => { const t0 = time; frame(now); return time !== t0; }, get fish() { return fish; }, mouse,

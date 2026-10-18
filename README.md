@@ -18,6 +18,16 @@ Open **Customise** on the wallpaper in Lively to change the settings below.
 
 > Lively's **Wallpaper input** setting must be **Mouse** (the default) for the wallpaper to react to your mouse.
 
+### Wallpaper Engine
+
+1. Download `ShallowSea-WallpaperEngine.zip` from the [latest release](https://github.com/Lego514/shallow-sea/releases/latest).
+2. Extract it into `…\steamapps\common\wallpaper_engine\projects\myprojects\`, so that a `shallow-sea` folder appears there.
+3. Restart Wallpaper Engine; Shallow Sea is listed under **Installed**. Its settings are in the panel on the right.
+
+Wallpaper Engine has no buttons in its settings, so **New seabed** and **Show seabed number** are switches: flip one to make it happen. Wallpaper Engine's own frame-rate limit and pause are respected.
+
+> The Wallpaper Engine version follows Wallpaper Engine's documented web-wallpaper API but hasn't been tried inside Wallpaper Engine yet. If something doesn't work, please [open an issue](https://github.com/Lego514/shallow-sea/issues).
+
 ## What you can do
 
 | Action | What happens |
@@ -55,6 +65,7 @@ shallow-sea/
   sea.js                 all of the simulation and shaders
   LivelyInfo.json        wallpaper info for Lively
   LivelyProperties.json  Lively's Customise panel (the web settings panel reads it too)
+  project.json           the same settings for Wallpaper Engine, generated from LivelyProperties.json
   thumbnail.jpg / preview.jpg / preview.gif / preview.webp   pictures for Lively and this README
 .github/workflows/pages.yml   publishes the web version to GitHub Pages on every push to main
 ```
@@ -96,6 +107,8 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 3. 把 zip 拖進 Lively 視窗（或按「＋ 新增桌布」選這個 zip），再點它套用。
 
 在 Lively 的桌布上按「自訂」可以調整設定。Lively 設定裡的「桌布輸入」要是「滑鼠」（預設就是），桌布才收得到滑鼠。
+
+**Wallpaper Engine**：到 Releases 下載 `ShallowSea-WallpaperEngine.zip`，解壓到 `…\steamapps\common\wallpaper_engine\projects\myprojects\`（會多一個 `shallow-sea` 資料夾），重開 Wallpaper Engine 後在「已安裝」裡就找得到。Wallpaper Engine 的設定沒有按鈕，所以「換一片海床」「顯示海床編號」是開關，切換一次就會執行。這個版本是照 Wallpaper Engine 的官方文件做的，還沒在 Wallpaper Engine 裡實際測過，有問題歡迎開 issue。
 
 ### 互動
 
