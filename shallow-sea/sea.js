@@ -633,48 +633,75 @@ ${NOISE}
 
 vec4 over(vec4 top, vec4 under) { return top + under * (1.0 - top.a); }
 
+// reef fish seen from above, head along +x, in body lengths: snout at x = 0.5, tail tips at -0.5.
+// x of v_b: 0 a little schooling fish, 1 a big fish; w of v_c says which big fish: 1 yellow tang, 2 sergeant major,
+// 3 bluefin trevally
 vec4 fish(vec2 q, out float sha) {
-  float phase = v_b.y, bend = v_b.z;
-  bool big = v_b.x > 0.5;
+  float phase = v_b.y, bend = v_b.z, look = v_c.w;
+  float bigF = step(0.5, v_b.x);
+  float isTang = bigF * step(0.5, look) * step(look, 1.5), isSgt = bigF * step(1.5, look) * step(look, 2.5);
+  float isTrev = bigF * step(2.5, look), isSmall = 1.0 - bigF;
   float aa = fwidth(q.x) + v_blur;
   float t = q.x + 0.5;                       // 0 tail tip .. 1 snout
   float tl = clamp(1.0 - t, 0.0, 1.0);
   q.y -= bend * (q.x - 0.25) * (q.x - 0.25);
   q.y -= 0.075 * tl * tl * sin(t * 6.0 - phase);
   float ay = abs(q.y);
-  float mw = big ? 0.165 : 0.105;
+  float mw = isSmall * 0.075 + isTang * 0.11 + isSgt * 0.135 + isTrev * 0.11;
 
-  float s = (t - 0.15) / 0.85;
-  float w;
-  if (s > 0.62) { float e = (s - 0.62) / 0.38; w = mw * sqrt(max(1.0 - e * e, 0.0)); }
-  else { float e = clamp(s / 0.62, 0.0, 1.0); w = mw * mix(0.17, 1.0, sin(e * 1.5707963)); }
-  float body = smoothstep(aa, -aa, max(ay - w, max(-s, s - 1.0) * 0.85));
-
+  // body: a rounded head (a pointed snout on the tang), widest a third of the way back, narrowing into the tail stock
+  float sb = (t - 0.18) / 0.82, w;
+  if (sb > 0.58) {
+    float e = clamp((sb - 0.58) / 0.42, 0.0, 1.0);
+    w = mw * pow(max(1.0 - pow(e, mix(2.0, 1.7, isTang)), 0.0), mix(0.5, 0.62, isTang));
+  } else {
+    float e = clamp(sb / 0.58, 0.0, 1.0);
+    w = mw * mix(mix(0.2, 0.15, isTrev), 1.0, sin(e * 1.5707963));
+  }
+  float body = smoothstep(aa, -aa, max(ay - w, max(-sb, sb - 1.0) * 0.85));
+  // tail: forked on most, nearly square on the tang, a deep crescent on the trevally
   float u = t / 0.2;
-  float outer = mw * mix(1.25, 0.2, clamp(u, 0.0, 1.0));
-  float notch = mw * 0.9 * clamp(1.0 - u / 0.55, 0.0, 1.0);
+  float fork = isSmall * 0.6 + isSgt * 0.5 + isTrev * 0.85 + isTang * 0.08;
+  float outer = mw * mix(mix(1.25, 1.5, isTrev), 0.2, clamp(u, 0.0, 1.0));
+  float notch = mw * 1.1 * clamp(1.0 - u / max(fork, 0.05), 0.0, 1.0) * step(0.1, fork);
   float tail = smoothstep(aa, -aa, max(max(ay - outer, notch - ay), max(-t, t - 0.21)));
-
+  // pectoral fins flicking at the sides; long sickles on the trevally
   float flap = sin(phase * 0.5 + 1.0);
   vec2 fd = normalize(vec2(-0.75, 0.62 + 0.25 * flap));
-  vec2 fq = vec2(q.x - 0.13, ay - mw * 0.8) - fd * 0.045;
-  float fin = smoothstep(aa, -aa, (length(vec2(dot(fq, fd) / 0.07, dot(fq, vec2(-fd.y, fd.x)) / 0.026)) - 1.0) * 0.026);
+  float fL = mix(0.07, 0.11, isTrev), fW = mix(0.026, 0.02, isTrev);
+  vec2 fq = vec2(q.x - 0.13, ay - mw * 0.8) - fd * fL * 0.6;
+  float fin = smoothstep(aa, -aa, (length(vec2(dot(fq, fd) / fL, dot(fq, vec2(-fd.y, fd.x)) / fW)) - 1.0) * fW);
+  // the dorsal fin, seen edge-on as a thin strip along the back
+  float dors = smoothstep(0.012, 0.004, ay) * smoothstep(-0.2, -0.1, q.x) * smoothstep(0.3, 0.2, q.x) * body;
 
+  float cy = clamp(ay / max(w, 1e-3), 0.0, 1.0), nz = sqrt(max(1.0 - cy * cy, 0.0));
   vec3 back = v_c.rgb;
-  vec3 side = mix(back, vec3(0.86, 0.90, 0.92), big ? 0.35 : 0.6);
-  float cy = clamp(ay / max(w, 1e-3), 0.0, 1.0);
-  vec3 bc = mix(back * 0.78, side, smoothstep(0.12, 0.95, cy));
-  if (v_c.w > 0.5) {
-    float st = smoothstep(0.2, 0.6, sin(q.x * v_c.w * 6.2831853 + 1.0));
-    bc = mix(bc, back * 0.3, st * 0.75 * step(s, 0.92));
-  }
-  vec2 eq = vec2(q.x - 0.38, ay - mw * 0.62);
-  float er = big ? 0.026 : 0.024;
+  // schooling fish: a dark back and a silver flank that flashes as they turn
+  vec3 cSmall = mix(back, vec3(0.78, 0.85, 0.88), smoothstep(0.45, 0.9, cy));
+  cSmall = mix(cSmall, vec3(0.95, 0.98, 1.0), smoothstep(0.55, 0.95, cy) * clamp(abs(bend) * 3.0, 0.0, 0.7));
+  // yellow tang: yellow all over, a white scalpel on the tail stock
+  vec3 cTang = back * (0.9 + 0.1 * nz);
+  cTang = mix(cTang, vec3(0.97), smoothstep(0.016, 0.009, length(vec2((q.x + 0.27) / 1.6, ay - w * 0.55))));
+  // sergeant major: a yellow-olive back, silvery sides, five dark bars
+  vec3 cSgt = mix(back * vec3(1.15, 1.1, 0.75), vec3(0.82, 0.86, 0.85), smoothstep(0.35, 0.9, cy));
+  float bars = smoothstep(0.35, 0.75, sin((q.x + 0.06 * cy * cy) * 52.0 + 1.0)) * smoothstep(-0.3, -0.26, q.x) * smoothstep(0.24, 0.2, q.x);
+  cSgt = mix(cSgt, vec3(0.1, 0.11, 0.12), bars * 0.7);
+  // bluefin trevally: a blue-green back flecked with black, silver-blue flanks
+  vec3 cTrev = mix(back, vec3(0.7, 0.8, 0.88), smoothstep(0.45, 0.95, cy));
+  cTrev *= 1.0 - 0.35 * step(0.82, hash21(floor(q * 70.0))) * smoothstep(0.7, 0.2, cy);
+  vec3 bc = cSmall * isSmall + cTang * isTang + cSgt * isSgt + cTrev * isTrev;
+  bc *= 0.8 + 0.25 * nz;                                                                   // rounded
+  bc = mix(bc, back * 0.6, dors * (1.0 - isTang) * 0.6);
+  // eyes on the sides of the head
+  float er = mix(0.016, 0.022, bigF);
+  vec2 eq = vec2(q.x - 0.37 + 0.07 * isTang, ay - w * 0.72);
+  bc = mix(bc, vec3(0.75, 0.78, 0.8), smoothstep(er * 1.6, er * 1.15, length(eq)) * isSmall * 0.6);
   bc = mix(bc, vec3(0.04), smoothstep(er + aa, er - aa, length(eq)));
-  vec3 finCol = mix(back, vec3(0.80, 0.86, 0.88), 0.35);
-
-  vec4 col = vec4(finCol, 1.0) * max(tail, fin) * 0.55;
-  col = over(vec4(bc, 1.0) * body * 0.94, col);
+  // fins: see-through, tinted to the fish; electric blue on the trevally, dark-edged tail on the sergeant major
+  vec3 finCol = isSmall * vec3(0.75, 0.82, 0.86) + isTang * back + isSgt * vec3(0.7, 0.72, 0.6) + isTrev * vec3(0.2, 0.55, 0.95);
+  finCol = mix(finCol, vec3(0.12), isSgt * smoothstep(0.6, 1.0, ay / max(outer, 1e-3)) * tail);
+  vec4 col = vec4(finCol, 1.0) * max(tail, fin) * mix(0.45, 0.75, bigF);
+  col = over(vec4(bc, 1.0) * body * 0.96, col);
   sha = max(body * 0.85, max(tail, fin) * 0.45);
   return col;
 }
@@ -814,60 +841,68 @@ vec4 manta(vec2 q, out float sha) {
   return vec4(col * a, a);
 }
 
-// moon jelly: a clear, pulsing bell, four violet horseshoe gonads, a fringe of fine tentacles
+// moon jelly: a clear, milky bell with a fringe of fine tentacles, four lilac horseshoe gonads, radial canals and
+// four frilly oral arms showing through the middle. It pulses (y.phase)
 vec4 moonJelly(vec2 q, out float sha) {
   float ph = v_b.y, aa = fwidth(q.x) + v_blur;
   float pulse = 0.5 + 0.5 * sin(ph);                          // 1 relaxed, 0 contracted
   float R = 0.5 * (0.86 + 0.14 * pulse);
   vec2 d = vec2(q.x * (1.0 + 0.06 * (1.0 - pulse)), q.y);
   float r = length(d), ang = atan(d.y, d.x);
-  float edge = R * (1.0 + 0.025 * sin(ang * 16.0));
+  float edge = R * (1.0 + 0.02 * sin(ang * 16.0));
   float bell = smoothstep(aa, -aa, r - edge);
-  float rim = smoothstep(R * 0.14, 0.0, abs(r - edge * 0.93)) * bell;
-  float fringe = smoothstep(R * 0.14, 0.0, r - edge) * (1.0 - bell) * (0.55 + 0.45 * sin(ang * 70.0 + ph));
-  float canal = smoothstep(0.9, 1.0, cos(ang * 8.0 + v_c.w * 6.28)) * smoothstep(R * 0.3, R * 0.55, r) * bell;
-  float gon = 0.0;
+  float rim = smoothstep(R * 0.1, 0.0, abs(r - edge * 0.95)) * bell;
+  float fringe = smoothstep(R * 0.12, 0.0, r - edge) * (1.0 - bell) * (0.5 + 0.5 * sin(ang * 90.0 + ph));
+  float canal = smoothstep(0.92, 1.0, cos(ang * 16.0 + v_c.w * 6.28)) * smoothstep(R * 0.35, R * 0.6, r) * smoothstep(R * 0.98, R * 0.85, r) * bell;
+  float gon = 0.0, arms = 0.0;
   for (int k = 0; k < 4; k++) {
     float a0 = float(k) * 1.5708 + v_c.w * 6.2831853 + 0.785;
     vec2 dir = vec2(cos(a0), sin(a0));
-    vec2 g = d - dir * R * 0.32;
-    float open = dot(normalize(g + 1e-5), dir);               // the horseshoe opens outwards
-    gon = max(gon, smoothstep(R * 0.05, R * 0.02, abs(length(g) - R * 0.15)) * smoothstep(0.75, 0.35, open));
+    vec2 g = d - dir * R * 0.3;
+    float open = dot(normalize(g + 1e-5), dir);               // each horseshoe opens toward the middle
+    gon = max(gon, smoothstep(R * 0.055, R * 0.025, abs(length(g) - R * 0.16)) * smoothstep(-0.8, -0.45, open));
+    vec2 ad = vec2(cos(a0 + 0.785), sin(a0 + 0.785));         // the arms run between the gonads
+    float along = dot(d, ad), across = dot(d, vec2(-ad.y, ad.x)) + 0.012 * sin(along * 70.0 + ph);
+    arms = max(arms, smoothstep(R * 0.07, R * 0.035, abs(across)) * smoothstep(0.0, R * 0.08, along) * smoothstep(R * 0.6, R * 0.3, along));
   }
-  float a = bell * 0.26 + rim * 0.45 + canal * 0.18 + fringe * 0.3;
-  vec4 c = vec4(vec3(0.86, 0.93, 1.0) * a, a);
-  c = over(vec4(0.88, 0.55, 0.92, 1.0) * gon * bell * 0.85, c);
+  float a = bell * 0.27 + rim * 0.5 + canal * 0.18 + fringe * 0.36 + arms * 0.22 * bell;
+  vec4 c = vec4(vec3(0.88, 0.94, 1.0) * a, a);
+  c.rgb += vec3(0.2) * bell * smoothstep(0.7, 0.0, length(d / R - vec2(0.25, 0.3))) * 0.35;     // sheen on the dome
+  c = over(vec4(0.92, 0.55, 0.86, 1.0) * gon * bell * 0.95, c);
   sha = c.a * 0.35;
   return c;
 }
 
-// sea nettle: a striped amber bell trailing long tentacles and frilly oral arms
+// Pacific sea nettle from above: a golden-amber bell with dark red-brown stripes radiating out to a scalloped rim,
+// pale ruffled oral arms and long, thin maroon tentacles trailing behind as it swims. It pulses (y.phase)
 vec4 seaNettle(vec2 q, out float sha) {
-  float ph = v_b.y, aa = fwidth(q.x) + v_blur;
+  float ph = v_b.y, aa = fwidth(q.x) + v_blur, seed = v_c.w * 6.28;
   float pulse = 0.5 + 0.5 * sin(ph);
   float R = 0.5 * (0.86 + 0.14 * pulse);
   float r = length(q), ang = atan(q.y, q.x);
-  float bell = smoothstep(aa, -aa, r - R * (1.0 + 0.03 * sin(ang * 16.0)));
-  float stripes = 0.5 + 0.5 * cos(ang * 16.0 + v_c.w * 6.28);
-  vec3 bc = mix(vec3(0.96, 0.64, 0.24), vec3(0.74, 0.30, 0.12), stripes * smoothstep(R * 0.3, R * 0.9, r));
-  bc = mix(bc, vec3(1.0, 0.86, 0.58), smoothstep(R * 0.35, 0.0, r) * 0.6);
-  vec4 c = vec4(bc, 1.0) * bell * (0.55 + 0.25 * smoothstep(R * 0.6, R, r));
+  float edge = R * (1.0 + 0.035 * abs(sin(ang * 8.0 + seed)));
+  float bell = smoothstep(aa, -aa, r - edge);
+  float stripe = smoothstep(0.75, 0.95, cos(ang * 16.0 + seed)) * smoothstep(R * 0.25, R * 0.55, r);
+  vec3 bc = mix(vec3(1.0, 0.48, 0.16), vec3(1.0, 0.75, 0.45), smoothstep(R * 0.45, 0.0, r));
+  bc = mix(bc, vec3(0.55, 0.12, 0.08), stripe * 0.8);
+  bc = mix(bc, vec3(0.85, 0.4, 0.15), smoothstep(R * 0.8, R, r) * 0.5);
+  vec4 c = vec4(bc, 1.0) * bell * (0.8 + 0.15 * smoothstep(R * 0.5, R, r));
   float x = -q.x;                                             // distance behind the bell
   float tent = 0.0;
-  for (int k = 0; k < 8; k++) {
-    float fk = float(k), u = clamp(x / 2.2, 0.0, 1.0);
-    float yy = (fk / 7.0 - 0.5) * R * 1.7 * (1.0 - 0.35 * u) + 0.06 * sin(x * 5.0 - ph * 0.8 + fk * 1.3) * x;
-    float w = 0.012 + 0.01 * (1.0 - u);
-    tent = max(tent, smoothstep(w + aa, w - aa, abs(q.y - yy)) * step(R * 0.6, x) * smoothstep(2.2, 1.3, x));
+  for (int k = 0; k < 10; k++) {
+    float fk = float(k), u = clamp(x / 2.1, 0.0, 1.0);
+    float yy = (fk / 9.0 - 0.5) * R * 1.8 * (1.0 - 0.45 * u) + (0.05 + 0.03 * sin(fk * 1.7)) * sin(x * 4.0 - ph * 0.8 + fk * 1.3) * x;
+    float w = mix(0.012, 0.005, u);
+    tent = max(tent, smoothstep(w + aa, w - aa, abs(q.y - yy)) * smoothstep(R * 0.5, R * 0.8, x) * (1.0 - u) * smoothstep(2.15, 1.6 + 0.4 * sin(fk * 2.3), x));
   }
   float arms = 0.0;
   for (int k = 0; k < 4; k++) {
     float fk = float(k);
-    float yy = (fk / 3.0 - 0.5) * R * 0.5 + 0.04 * sin(x * 3.5 - ph * 0.6 + fk * 2.1) * x;
-    float w = R * 0.10 * (1.0 + 0.45 * sin(x * 40.0 + fk)) * (1.0 - 0.5 * clamp(x / 1.4, 0.0, 1.0));
-    arms = max(arms, smoothstep(w + aa, w - aa, abs(q.y - yy)) * step(0.0, x) * smoothstep(1.4, 0.8, x));
+    float yy = (fk / 3.0 - 0.5) * R * 0.45 + 0.05 * sin(x * 3.0 - ph * 0.6 + fk * 2.1) * x;
+    float w = R * 0.09 * (1.0 + 0.5 * sin(x * 45.0 + fk * 3.0)) * (1.0 - 0.6 * clamp(x / 1.3, 0.0, 1.0));
+    arms = max(arms, smoothstep(w + aa, w - aa, abs(q.y - yy)) * step(0.0, x) * smoothstep(1.35, 0.7, x));
   }
-  c = over(c, over(vec4(0.99, 0.91, 0.86, 1.0) * arms * 0.6, vec4(0.92, 0.40, 0.18, 1.0) * tent * 0.75));
+  c = over(c, over(vec4(1.0, 0.94, 0.88, 1.0) * arms * 0.55, vec4(0.6, 0.16, 0.1, 1.0) * tent * 0.85));
   sha = c.a * 0.4;
   return c;
 }
@@ -1829,9 +1864,9 @@ const RAY_KINDS = {
 let floats = [];
 
 const BIG_LOOKS = [
-  { col: [0.96, 0.80, 0.20], stripes: 0 },     // yellow tang
-  { col: [0.60, 0.62, 0.44], stripes: 5 },     // sergeant major
-  { col: [0.26, 0.42, 0.56], stripes: 0 },     // bluefin trevally
+  { col: [0.96, 0.80, 0.20], id: 1 },     // yellow tang
+  { col: [0.60, 0.62, 0.44], id: 2 },     // sergeant major
+  { col: [0.22, 0.38, 0.44], id: 3 },     // bluefin trevally
 ];
 
 function newFish(kind, x, y) {
@@ -1845,7 +1880,7 @@ function newFish(kind, x, y) {
     f.cruise = rand(0.06, 0.085);
     f.depth = rand(0.42, 0.62);
     const v = rand(-0.05, 0.05);
-    f.col = [0.30 + v, 0.41 + v, 0.45 + v];
+    f.col = [0.2 + v, 0.3 + v, 0.34 + v];
     f.extra = 0;
   } else {
     const look = BIG_LOOKS[fish.filter(g => g.kind === 1).length % BIG_LOOKS.length];
@@ -1853,7 +1888,7 @@ function newFish(kind, x, y) {
     f.cruise = rand(0.045, 0.06);
     f.depth = rand(0.5, 0.65);
     f.col = look.col;
-    f.extra = look.stripes;
+    f.extra = look.id;
   }
   f.vx = Math.cos(f.ang) * f.cruise;
   f.vy = Math.sin(f.ang) * f.cruise;
@@ -1925,7 +1960,7 @@ function newJelly(x, y) {
   return {
     kind, x, y, ang: rand(0, TAU), turn: rand(-0.15, 0.15), vx: 0, vy: 0,
     len: kind === 7 ? rand(0.08, 0.11) : rand(0.065, 0.085),
-    phase: rand(0, TAU), rate: rand(0.55, 0.85) * TAU, depth: rand(0.3, 0.55), extra: Math.random(),
+    phase: rand(0, TAU), rate: rand(0.55, 0.85) * TAU, depth: rand(0.22, 0.45), extra: Math.random(),
   };
 }
 function syncJellies() {
