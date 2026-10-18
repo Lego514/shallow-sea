@@ -1,0 +1,391 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>淺海</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+  /* One full-bleed WebGL coast seen from above, with a settings drawer that slides over the water from the right.
+     A single deliberate look (the sea at depth), so no light/dark switch: every colour is set explicitly here. */
+  :root {
+    --sea: #0d4a52;
+    --ink: #eaf7f5;
+    --ink-soft: rgba(234, 247, 245, 0.66);
+    --veil: rgba(3, 32, 40, 0.5);
+    --panel: rgba(5, 29, 36, 0.86);
+    --line: rgba(160, 225, 218, 0.16);
+    --field: rgba(255, 255, 255, 0.07);
+    --accent: #5fd6c8;
+    --accent-ink: #032a2e;
+    --ui: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--sea); color: var(--ink); overflow: hidden; font-family: var(--ui); }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  #msg {
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center;
+    padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px));
+    color: var(--ink); font-size: 15px; line-height: 1.6;
+  }
+  #stats {
+    position: fixed; left: 8px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); display: none;
+    padding: 3px 6px; border-radius: 3px; background: var(--veil); color: var(--ink);
+    font: 12px/1.4 Consolas, ui-monospace, monospace;
+  }
+  #hint {
+    position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+    width: max-content; max-width: calc(100% - 140px); margin: 0; padding: 8px 16px; border-radius: 999px;
+    background: var(--veil); color: var(--ink-soft); font-size: 13px; letter-spacing: 0.04em; text-align: center;
+    pointer-events: none; transition: opacity 1.2s ease;
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  }
+  #hint.gone { opacity: 0; }
+
+  /* the seabed number pops up top-left here, clear of the settings drawer */
+  #seedTag { left: calc(16px + env(safe-area-inset-left, 0px)) !important; right: auto !important; top: calc(16px + env(safe-area-inset-top, 0px)) !important; }
+
+  /* ---- gear button */
+  #gear {
+    position: fixed; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    width: 46px; height: 46px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%;
+    background: var(--veil); color: var(--ink); cursor: pointer;
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); transition: background .2s, transform .3s;
+  }
+  #gear:hover { background: var(--panel); }
+  #gear[aria-expanded="true"] { transform: rotate(60deg); }
+  #gear:focus-visible, .drawer :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---- settings drawer */
+  .drawer {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(360px, 100%); display: flex; flex-direction: column;
+    background: var(--panel); border-left: 1px solid var(--line); color: var(--ink);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    transform: translateX(105%); transition: transform .35s cubic-bezier(.2, .8, .2, 1);
+    padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  .drawer.open { transform: none; }
+  .drawer header {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 18px 20px 14px; border-bottom: 1px solid var(--line);
+  }
+  .drawer h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.08em; }
+  .drawer h2 { min-width: 0; }
+  .drawer h2 small { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--ink-soft); letter-spacing: 0.04em; }
+  .icon-btn {
+    width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 8px;
+    background: transparent; color: var(--ink); cursor: pointer; font-size: 20px; line-height: 1;
+  }
+  .icon-btn:hover { background: var(--field); }
+  .rows { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 4px 20px 20px; display: flex; flex-direction: column; }
+  .rows h3 {
+    margin: 22px 0 6px; font-size: 12px; font-weight: 500; color: var(--accent); letter-spacing: 0.18em;
+  }
+  .row { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .row:last-child { border-bottom: 0; }
+  .row .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .row label, .row .name { font-size: 14px; font-weight: 500; }
+  .row output { font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; min-width: 2.5em; text-align: right; }
+  .row .help { margin: 0; font-size: 12px; line-height: 1.55; color: var(--ink-soft); }
+  .row input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
+  .row select, .row input[type="text"] {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--field); color: var(--ink); font: inherit; font-size: 14px;
+  }
+  .row select option { background: #06242b; color: var(--ink); }
+  .row input[type="color"] {
+    width: 44px; height: 30px; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); cursor: pointer;
+  }
+  .switch { position: relative; width: 42px; height: 24px; flex: none; }
+  .switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+  .switch span { position: absolute; inset: 0; border-radius: 999px; background: var(--field); border: 1px solid var(--line); transition: background .2s; pointer-events: none; }
+  .switch span::after {
+    content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--ink); transition: transform .2s;
+  }
+  .switch input:checked + span { background: var(--accent); border-color: var(--accent); }
+  .switch input:checked + span::after { transform: translateX(18px); background: var(--accent-ink); }
+  .switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn {
+    padding: 7px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--field);
+    color: var(--ink); font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .drawer footer { padding: 12px 20px 16px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .drawer footer p { margin: 0; font-size: 12px; color: var(--ink-soft); }
+  @media (prefers-reduced-motion: reduce) { #hint, .drawer, #gear, .switch span, .switch span::after { transition: none; } }
+</style>
+<style>
+  /* language switch: two segments in the drawer header */
+  .lang { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; gap: 2px; }
+  .lang button {
+    padding: 3px 10px; border: 0; border-radius: 999px; background: transparent; color: var(--ink-soft);
+    font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap;
+  }
+  .lang button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .drawer header .tools { display: flex; align-items: center; gap: 8px; flex: none; }
+</style>
+<canvas id="sea"></canvas>
+<div id="msg"></div>
+<div id="stats"></div>
+<p id="hint"></p>
+
+<button id="gear" type="button" aria-expanded="false" aria-controls="settings">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+    <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/>
+    <circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>
+  </svg>
+</button>
+
+<aside class="drawer" id="settings" role="dialog" aria-hidden="true">
+  <header>
+    <h2><span id="t-title"></span><small id="t-sub"></small></h2>
+    <div class="tools">
+      <div class="lang" role="group" aria-label="語言 / Language">
+        <button type="button" data-lang="zh" aria-pressed="false">中文</button>
+        <button type="button" data-lang="en" aria-pressed="false">EN</button>
+      </div>
+      <button class="icon-btn" id="closeSettings" type="button">×</button>
+    </div>
+  </header>
+  <div class="rows" id="rows"></div>
+  <footer>
+    <p id="t-applies"></p>
+    <button class="btn" id="resetSettings" type="button"></button>
+  </footer>
+</aside>
+
+<script src="sea.js"></script>
+<script>
+  (() => {
+    // ---- words: Chinese comes from LivelyProperties.json itself; English lives here
+    const UI = {
+      zh: {
+        hint: '劃過水面起漣漪・點一下濺起水花・在沙灘上按住拖曳寫字',
+        settings: '設定', sub: '只記在這個瀏覽器', close: '關閉設定', applies: '改動會立刻套用', reset: '恢復預設',
+        loading: '載入中…', failed: '設定載入失敗，重新整理頁面再試一次。', seedWord: '海床編號',
+        shuffle: '換一片', useCurrent: '填入目前的', currentSeed: '目前的海床編號',
+        seedPlaceholder: n => `目前 ${n}（留空＝每次隨機）`,
+      },
+      en: {
+        hint: 'Swipe the water for ripples · tap to splash · drag on the sand to write',
+        settings: 'Settings', sub: 'saved in this browser only', close: 'Close settings', applies: 'Changes apply right away', reset: 'Restore defaults',
+        loading: 'Loading…', failed: 'Settings didn’t load. Reload the page to try again.', seedWord: 'Seabed No.',
+        shuffle: 'Shuffle', useCurrent: 'Use current', currentSeed: 'Current seabed number',
+        seedPlaceholder: n => `Now ${n} (leave empty for a new one each time)`,
+      },
+    };
+    // help text that only makes sense inside Lively, reworded for the web
+    const WEB_ZH = {
+      sound: { help: '跟畫面同步的浪聲；點一下水面也會有聲音' },
+      seabedNumber: { help: '喜歡現在這片海床？按「填入目前的」，下次打開這個網頁還是這片。留空＝每次隨機' },
+    };
+    const EN = {
+      labelScene: { value: 'Scene' },
+      timeOfDay: { text: 'Time of day', help: 'Auto follows your clock; at night the plankton glows',
+                   items: ['Auto (system clock)', 'Morning', 'Noon', 'Sunset', 'Night'] },
+      shore: { text: 'Beach', help: 'Press and drag on the sand to write; the next big wave wipes it away',
+               items: ['Top left', 'Top', 'Top right', 'Left', 'Right', 'Bottom', 'No beach (open shallows)'] },
+      waterColor: { text: 'Shallow water colour' },
+      deepColor: { text: 'Deep water colour' },
+      newSeabed: { text: 'New seabed' },
+      seabedNumber: { text: 'Fixed seabed number',
+                      help: 'Like this seabed? Press “Use current” and it comes back every time you open the page. Leave empty for a new one each time.' },
+      tide: { text: 'Tides', help: 'Rises and falls with real time, about every 12.4 hours' },
+      labelWater: { value: 'Water' },
+      causticStrength: { text: 'Caustic light' },
+      waveStrength: { text: 'Wave size' },
+      waveSpeed: { text: 'Wave speed' },
+      rippleStrength: { text: 'Mouse ripples' },
+      rain: { text: 'Rain' },
+      clouds: { text: 'Cloud shadows' },
+      labelLife: { value: 'Sea life' },
+      fishCount: { text: 'Small fish' },
+      bigFish: { text: 'Big fish' },
+      rays: { text: 'Rays', help: 'A blue-spotted stingray rests on the sand; an eagle ray and a manta fly through the water' },
+      turtle: { text: 'Sea turtle', help: 'Swims by from deep water now and then, coming up to breathe' },
+      beachLife: { text: 'Hermit crabs & gulls', help: 'Crabs wander the sand leaving footprints and hide when you come close; gulls show only as shadows' },
+      jellyCount: { text: 'Jellyfish' },
+      floatCount: { text: 'Floating flowers & leaves' },
+      labelSound: { value: 'Sound' },
+      sound: { text: 'Wave sounds', help: 'Surf in step with the picture; tapping the water makes a plop too' },
+      volume: { text: 'Volume' },
+      labelPerf: { value: 'Performance' },
+      quality: { text: 'Quality', help: 'Lower it on a slow graphics card or a 4K screen',
+                 items: ['High (native resolution)', 'Medium (75%)', 'Low (50%)'] },
+      fps30: { text: 'Limit to 30 FPS', help: 'Uses less power' },
+    };
+
+    const STORE = 'shallow-sea-settings', LANG_STORE = 'shallow-sea-lang';
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(STORE) || '{}') || {}; } catch (e) { saved = {}; }
+    let lang = null;
+    try { lang = localStorage.getItem(LANG_STORE); } catch (e) { /* no storage */ }
+    if (lang !== 'zh' && lang !== 'en') lang = /^zh/i.test(navigator.language || '') ? 'zh' : 'en';
+    const persist = () => { try { localStorage.setItem(STORE, JSON.stringify(saved)); } catch (e) { /* private window: settings last for this visit */ } };
+    const apply = (key, value) => { try { window.livelyPropertyListener && window.livelyPropertyListener(key, value); } catch (e) { console.error(e); } };
+    const change = (key, value) => { saved[key] = value; persist(); apply(key, value); };
+
+    const hint = document.getElementById('hint');
+    const hideHint = () => hint.classList.add('gone');
+    setTimeout(hideHint, 8000);
+    addEventListener('pointerdown', hideHint, { once: true });
+
+    const gear = document.getElementById('gear');
+    const drawer = document.getElementById('settings');
+    const rows = document.getElementById('rows');
+    const langButtons = drawer.querySelectorAll('.lang button');
+
+    // keep the drawer's own clicks and drags from splashing the water underneath
+    for (const t of ['mousedown', 'mousemove', 'mouseup', 'wheel', 'touchstart', 'touchmove']) {
+      drawer.addEventListener(t, e => e.stopPropagation(), { passive: true });
+      gear.addEventListener(t, e => e.stopPropagation(), { passive: true });
+    }
+    const setOpen = open => {
+      drawer.classList.toggle('open', open);
+      drawer.setAttribute('aria-hidden', String(!open));
+      gear.setAttribute('aria-expanded', String(open));
+      if (open) (drawer.querySelector('input, select, button.btn') || drawer).focus();
+      else gear.focus();
+    };
+    gear.addEventListener('click', () => setOpen(!drawer.classList.contains('open')));
+    document.getElementById('closeSettings').addEventListener('click', () => setOpen(false));
+    addEventListener('keydown', e => { if (e.key === 'Escape' && drawer.classList.contains('open')) setOpen(false); });
+
+    // a property's words in the current language
+    const words = (key, p) => {
+      if (lang === 'en') return { ...p, ...(EN[key] || {}) };
+      return { ...p, ...(WEB_ZH[key] || {}) };
+    };
+
+    let props = null;
+    const controls = {};   // key -> { prop, set(value) } so "restore defaults" can move every control back
+
+    function paintChrome() {
+      const t = UI[lang];
+      document.documentElement.lang = lang === 'zh' ? 'zh-Hant' : 'en';
+      hint.textContent = t.hint;
+      gear.setAttribute('aria-label', t.settings);
+      drawer.setAttribute('aria-label', t.settings);
+      document.getElementById('t-title').textContent = t.settings;
+      document.getElementById('t-sub').textContent = t.sub;
+      document.getElementById('closeSettings').setAttribute('aria-label', t.close);
+      document.getElementById('t-applies').textContent = t.applies;
+      document.getElementById('resetSettings').textContent = t.reset;
+      langButtons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
+      if (window.sea && window.sea.setSeedWord) window.sea.setSeedWord(t.seedWord);
+      if (!props) rows.innerHTML = `<p class="help">${t.loading}</p>`;
+    }
+
+    function build() {
+      const t = UI[lang];
+      rows.textContent = '';
+      let seedInput = null;
+      const seedPlaceholder = () => { if (seedInput) seedInput.placeholder = t.seedPlaceholder(window.sea.seed); };
+      for (const [key, raw] of Object.entries(props)) {
+        const p = words(key, raw);
+        const id = 'set-' + key;
+        const value = key in saved ? saved[key] : raw.value;
+        if (p.type === 'label') {
+          const h = document.createElement('h3'); h.textContent = p.value; rows.appendChild(h); continue;
+        }
+        const r = document.createElement('div'); r.className = 'row';
+        const top = document.createElement('div'); top.className = 'top';
+        r.appendChild(top);
+        const label = text => { const l = document.createElement('label'); l.htmlFor = id; l.textContent = text; return l; };
+        if (p.type === 'button') {
+          const name = document.createElement('span'); name.className = 'name'; name.textContent = p.text;
+          const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.id = id;
+          if (key === 'newSeabed') {
+            b.textContent = t.shuffle;
+            b.addEventListener('click', () => {
+              window.sea.regenerate();
+              if (seedInput && seedInput.value) { seedInput.value = ''; change('seabedNumber', ''); }
+              seedPlaceholder();
+            });
+          } else if (key === 'showSeabed') {
+            name.textContent = t.currentSeed;
+            b.textContent = t.useCurrent;
+            b.addEventListener('click', () => {
+              if (!seedInput) return;
+              seedInput.value = String(window.sea.seed);
+              change('seabedNumber', seedInput.value);
+              apply('showSeabed', true);
+            });
+          } else {
+            b.textContent = p.value;
+            b.addEventListener('click', () => apply(key, raw.value));
+          }
+          top.append(name, b);
+        } else if (p.type === 'slider') {
+          const out = document.createElement('output'); out.htmlFor = id;
+          const s = document.createElement('input'); s.type = 'range'; s.id = id;
+          s.min = p.min; s.max = p.max; s.step = p.step || 1;
+          const show = v => { s.value = v; out.textContent = Math.round(v); };
+          show(value);
+          s.addEventListener('input', () => { out.textContent = Math.round(s.value); change(key, +s.value); });
+          top.append(label(p.text), out); r.appendChild(s);
+          controls[key] = { prop: raw, set: show };
+        } else if (p.type === 'checkbox') {
+          const sw = document.createElement('span'); sw.className = 'switch';
+          const c = document.createElement('input'); c.type = 'checkbox'; c.id = id; c.checked = !!value;
+          c.setAttribute('role', 'switch');
+          c.addEventListener('change', () => change(key, c.checked));
+          sw.append(c, document.createElement('span'));
+          top.append(label(p.text), sw);
+          controls[key] = { prop: raw, set: v => { c.checked = !!v; } };
+        } else if (p.type === 'dropdown') {
+          const sel = document.createElement('select'); sel.id = id;
+          p.items.forEach((name, i) => { const o = document.createElement('option'); o.value = i; o.textContent = name; sel.appendChild(o); });
+          sel.value = value;
+          sel.addEventListener('change', () => change(key, +sel.value));
+          top.appendChild(label(p.text)); r.appendChild(sel);
+          controls[key] = { prop: raw, set: v => { sel.value = v; } };
+        } else if (p.type === 'color') {
+          const c = document.createElement('input'); c.type = 'color'; c.id = id; c.value = String(value).toLowerCase();
+          c.addEventListener('input', () => change(key, c.value));
+          top.append(label(p.text), c);
+          controls[key] = { prop: raw, set: v => { c.value = String(v).toLowerCase(); } };
+        } else if (p.type === 'textbox') {
+          const tb = document.createElement('input'); tb.type = 'text'; tb.id = id; tb.value = value || '';
+          tb.inputMode = 'numeric'; tb.autocomplete = 'off';
+          if (key === 'seabedNumber') { seedInput = tb; seedPlaceholder(); }
+          tb.addEventListener('input', () => change(key, tb.value.trim()));
+          top.appendChild(label(p.text)); r.appendChild(tb);
+          controls[key] = { prop: raw, set: v => { tb.value = v || ''; } };
+        } else continue;
+        if (p.help) { const h = document.createElement('p'); h.className = 'help'; h.textContent = p.help; r.appendChild(h); }
+        rows.appendChild(r);
+      }
+    }
+
+    langButtons.forEach(b => b.addEventListener('click', () => {
+      if (b.dataset.lang === lang) return;
+      lang = b.dataset.lang;
+      try { localStorage.setItem(LANG_STORE, lang); } catch (e) { /* no storage */ }
+      const scroll = rows.scrollTop;
+      paintChrome();
+      if (props) build();
+      rows.scrollTop = scroll;
+      b.focus();
+    }));
+
+    document.getElementById('resetSettings').addEventListener('click', () => {
+      saved = {};
+      persist();
+      for (const [key, c] of Object.entries(controls)) { c.set(c.prop.value); apply(key, c.prop.value); }
+    });
+
+    paintChrome();
+    fetch('LivelyProperties.json')
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(p => {
+        props = p;
+        build();
+        // bring back what this viewer chose last time
+        for (const [key, value] of Object.entries(saved)) if (props[key]) apply(key, value);
+      })
+      .catch(() => { rows.innerHTML = `<p class="help">${UI[lang].failed}</p>`; });
+  })();
+</script>

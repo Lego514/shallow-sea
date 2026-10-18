@@ -1,0 +1,180 @@
+{
+  "labelScene": {
+    "type": "label",
+    "value": "場景"
+  },
+  "timeOfDay": {
+    "type": "dropdown",
+    "value": 0,
+    "text": "時段",
+    "help": "自動會跟著系統時鐘變化，晚上有螢光浮游生物",
+    "items": ["自動（依系統時間）", "早晨", "正午", "黃昏", "夜晚"]
+  },
+  "shore": {
+    "type": "dropdown",
+    "value": 0,
+    "text": "沙灘位置",
+    "help": "在沙灘上按住滑鼠拖曳可以在沙上寫字，浪打上來會把字抹掉",
+    "items": ["左上角", "上方", "右上角", "左側", "右側", "下方", "沒有沙灘（整片淺海）"]
+  },
+  "waterColor": {
+    "type": "color",
+    "value": "#1F9EBD",
+    "text": "淺水顏色"
+  },
+  "deepColor": {
+    "type": "color",
+    "value": "#114A82",
+    "text": "深海顏色"
+  },
+  "newSeabed": {
+    "type": "button",
+    "value": "換一片",
+    "text": "重新產生海床"
+  },
+  "showSeabed": {
+    "type": "button",
+    "value": "顯示",
+    "text": "顯示目前海床編號"
+  },
+  "seabedNumber": {
+    "type": "textbox",
+    "value": "",
+    "text": "固定海床編號",
+    "help": "喜歡現在這片海床？按上面的「顯示」，把右上角出現的數字填進來，以後開機都會是這片。留空＝每次隨機"
+  },
+  "tide": {
+    "type": "checkbox",
+    "value": true,
+    "text": "潮汐",
+    "help": "照真實時間大約每 12.4 小時漲退一次"
+  },
+  "labelWater": {
+    "type": "label",
+    "value": "水面"
+  },
+  "causticStrength": {
+    "max": 100,
+    "min": 0,
+    "text": "光紋強度",
+    "type": "slider",
+    "value": 90
+  },
+  "waveStrength": {
+    "max": 100,
+    "min": 0,
+    "text": "波浪大小",
+    "type": "slider",
+    "value": 50
+  },
+  "waveSpeed": {
+    "max": 100,
+    "min": 0,
+    "text": "波浪速度",
+    "type": "slider",
+    "value": 40
+  },
+  "rippleStrength": {
+    "max": 100,
+    "min": 0,
+    "text": "滑鼠漣漪強度",
+    "type": "slider",
+    "value": 60
+  },
+  "rain": {
+    "max": 100,
+    "min": 0,
+    "text": "雨",
+    "type": "slider",
+    "value": 0
+  },
+  "clouds": {
+    "max": 100,
+    "min": 0,
+    "text": "雲影",
+    "type": "slider",
+    "value": 30
+  },
+  "labelLife": {
+    "type": "label",
+    "value": "生物"
+  },
+  "fishCount": {
+    "max": 60,
+    "min": 0,
+    "text": "小魚數量",
+    "type": "slider",
+    "value": 26
+  },
+  "bigFish": {
+    "type": "checkbox",
+    "value": true,
+    "text": "大魚"
+  },
+  "rays": {
+    "type": "checkbox",
+    "value": true,
+    "text": "魟魚",
+    "help": "藍點魟趴在沙上，斑點鷹魟和鬼蝠魟在水中拍翅膀游"
+  },
+  "turtle": {
+    "type": "checkbox",
+    "value": true,
+    "text": "海龜",
+    "help": "偶爾從深水游過來，不時浮上水面換氣"
+  },
+  "beachLife": {
+    "type": "checkbox",
+    "value": true,
+    "text": "寄居蟹與海鷗",
+    "help": "寄居蟹在沙灘上爬、留下腳印，靠近會縮進殼裡；海鷗只看得到影子"
+  },
+  "jellyCount": {
+    "max": 20,
+    "min": 0,
+    "text": "水母數量",
+    "type": "slider",
+    "value": 6
+  },
+  "floatCount": {
+    "max": 12,
+    "min": 0,
+    "text": "漂浮的花與葉",
+    "type": "slider",
+    "value": 4
+  },
+  "labelSound": {
+    "type": "label",
+    "value": "聲音"
+  },
+  "sound": {
+    "type": "checkbox",
+    "value": false,
+    "text": "海浪聲",
+    "help": "跟畫面同步的浪聲；Lively 的音量設定也會影響"
+  },
+  "volume": {
+    "max": 100,
+    "min": 0,
+    "text": "音量",
+    "type": "slider",
+    "value": 60
+  },
+  "labelPerf": {
+    "type": "label",
+    "value": "效能"
+  },
+  "quality": {
+    "type": "dropdown",
+    "value": 0,
+    "text": "畫質",
+    "help": "顯示卡較弱或 4K 螢幕可調低",
+    "items": ["高（原生解析度）", "中（75%）", "低（50%）"]
+  },
+  "fps30": {
+    "type": "checkbox",
+    "value": false,
+    "text": "鎖定 30 FPS",
+    "help": "降低耗電"
+  }
+}

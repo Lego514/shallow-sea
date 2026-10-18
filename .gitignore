@@ -1,0 +1,5 @@
+# local editor / preview config
+.claude/
+
+# the packaged wallpaper is attached to GitHub Releases instead
+dist/

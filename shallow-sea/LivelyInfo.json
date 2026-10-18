@@ -1,0 +1,14 @@
+{
+  "AppVersion": "2.0.0.0",
+  "Title": "淺海 Shallow Sea",
+  "Thumbnail": "thumbnail.jpg",
+  "Preview": "preview.jpg",
+  "Desc": "可以互動的海岸：從沙灘、清澈淺水漸層到深藍海，浪會一波波沖上沙灘。滑鼠劃過水面起漣漪、點擊濺起水花、在沙灘上拖曳可以寫字；魚群會躲開或好奇靠近，還有魟魚、鬼蝠魟和水母，夜晚觸碰海水和浪花會亮起藍色螢光。",
+  "Author": "Claude",
+  "License": "",
+  "Contact": "",
+  "Type": 1,
+  "FileName": "index.html",
+  "Arguments": null,
+  "IsAbsolutePath": false
+}
