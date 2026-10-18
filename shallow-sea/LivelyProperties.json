@@ -143,6 +143,12 @@
     "text": "Hermit crabs & gulls 寄居蟹與海鷗",
     "help": "Crabs wander the sand leaving footprints and hide when you come close; gulls show only as shadows. 寄居蟹在沙灘上爬、留下腳印，靠近會縮進殼裡；海鷗只看得到影子"
   },
+  "feedFish": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Feed the fish 餵魚",
+    "help": "Hold the mouse still on the water to sprinkle food; the fish rush over to eat it. 在水面上按住滑鼠不動就會撒飼料，魚會游過來搶食"
+  },
   "jellyCount": {
     "max": 20,
     "min": 0,

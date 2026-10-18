@@ -162,14 +162,14 @@
     // ---- words: Chinese comes from LivelyProperties.json itself; English lives here
     const UI = {
       zh: {
-        hint: '劃過水面起漣漪・點一下濺起水花・在沙灘上按住拖曳寫字',
+        hint: '劃過水面起漣漪・點一下濺起水花・在水面按住不動餵魚・在沙灘上拖曳寫字',
         settings: '設定', sub: '只記在這個瀏覽器', close: '關閉設定', applies: '改動會立刻套用', reset: '恢復預設',
         loading: '載入中…', failed: '設定載入失敗，重新整理頁面再試一次。', seedWord: '海床編號',
         shuffle: '換一片', useCurrent: '填入目前的', currentSeed: '目前的海床編號',
         seedPlaceholder: n => `目前 ${n}（留空＝每次隨機）`,
       },
       en: {
-        hint: 'Swipe the water for ripples · tap to splash · drag on the sand to write',
+        hint: 'Swipe for ripples · tap to splash · hold still on the water to feed the fish · drag on the sand to write',
         settings: 'Settings', sub: 'saved in this browser only', close: 'Close settings', applies: 'Changes apply right away', reset: 'Restore defaults',
         loading: 'Loading…', failed: 'Settings didn’t load. Reload the page to try again.', seedWord: 'Seabed No.',
         shuffle: 'Shuffle', useCurrent: 'Use current', currentSeed: 'Current seabed number',
@@ -265,6 +265,10 @@
         "text": "海龜",
         "help": "偶爾從深水游過來，不時浮上水面換氣"
       },
+      "feedFish": {
+        "text": "餵魚",
+        "help": "在水面上按住不動就會撒飼料，魚會游過來搶食"
+      },
       "beachLife": {
         "text": "寄居蟹與海鷗",
         "help": "寄居蟹在沙灘上爬、留下腳印，靠近會縮進殼裡；海鷗只看得到影子"
@@ -336,6 +340,7 @@
       rays: { text: 'Rays', help: 'A blue-spotted stingray rests on the sand; an eagle ray and a manta fly through the water' },
       turtle: { text: 'Sea turtle', help: 'Swims by from deep water now and then, coming up to breathe' },
       beachLife: { text: 'Hermit crabs & gulls', help: 'Crabs wander the sand leaving footprints and hide when you come close; gulls show only as shadows' },
+      feedFish: { text: 'Feed the fish', help: 'Hold still on the water to sprinkle food; the fish rush over to eat it' },
       jellyCount: { text: 'Jellyfish' },
       floatCount: { text: 'Floating flowers & leaves' },
       labelSound: { value: 'Sound' },

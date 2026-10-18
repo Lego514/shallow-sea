@@ -18,6 +18,7 @@ const NW = 10;          // analytic wind waves
 const MAX_DROPS = 16;   // ripple impulses per frame
 const MAX_FISH = 64;
 const MAX_FLOATS = 12;
+const MAX_PELLETS = 60;
 
 const canvas = document.getElementById('sea');
 const msgEl = document.getElementById('msg');
@@ -50,6 +51,7 @@ const S = {
   jellies: 6,
   turtle: true,
   beachLife: true,
+  feed: true,                  // hold still on the water to sprinkle fish food
   tide: true,
   sound: false,
   volume: 0.48,
@@ -578,7 +580,8 @@ void main() {
   else if (sp < 8.5) { ext = vec2(1.4, 0.66); off = vec2(-0.85, 0.0); } // sea nettle, tentacles trailing
   else if (sp < 9.5) { ext = vec2(0.72, 0.8); off = vec2(0.06, 0.0); }  // sea turtle
   else if (sp < 10.5) ext = vec2(0.62, 0.62);                            // hermit crab
-  else { ext = vec2(0.66, 1.0); off = vec2(-0.08, 0.0); }               // gull (only its shadow is drawn)
+  else if (sp < 11.5) { ext = vec2(0.66, 1.0); off = vec2(-0.08, 0.0); } // gull (only its shadow is drawn)
+  else ext = vec2(0.62, 0.62);                                           // a crumb of fish food
   vec2 pos = i_a.xy;
   vec2 uv = clamp(vec2(pos.x / u_aspect, pos.y), 0.0, 1.0);
   float blur = 0.0;
@@ -908,6 +911,15 @@ vec4 hermitCrab(vec2 q, out float sha) {
   return c;
 }
 
+// a crumb of fish food: a little rounded flake, lit on one side
+vec4 pellet(vec2 q, out float sha) {
+  float aa = fwidth(q.x) + v_blur;
+  float a = smoothstep(0.5 + aa, 0.5 - aa, length(q * vec2(1.0, 1.2)));
+  vec3 c = v_c.rgb * (0.75 + 0.45 * smoothstep(0.55, -0.1, length(q - vec2(-0.12, 0.16))));
+  sha = a * 0.7;
+  return vec4(c * a, a);
+}
+
 // a gull gliding overhead: never seen itself, only its shadow sweeping over sand and water
 vec4 gull(vec2 q, out float sha) {
   float ph = v_b.y, aa = fwidth(q.x) + v_blur;
@@ -934,7 +946,8 @@ void main() {
   else if (sp < 8.5) c = seaNettle(v_q, sha);
   else if (sp < 9.5) c = turtle(v_q, sha);
   else if (sp < 10.5) c = hermitCrab(v_q, sha);
-  else c = gull(v_q, sha);
+  else if (sp < 11.5) c = gull(v_q, sha);
+  else c = pellet(v_q, sha);
   if (u_shadow == 1) o = vec4(sha, 0.0, 0.0, sha);
   else if (u_shadow == 2) o = vec4(0.0, sp > 6.5 && sp < 8.5 ? min(c.a * 1.8, 1.0) : 0.0, 0.0, 0.0);   // jellyfish glow
   else o = c;
@@ -1284,8 +1297,8 @@ function makeBatch(max) {
   return { vao, buf, data: new Float32Array(max * 12), count: 0 };
 }
 const deepBatch = makeBatch(4);
-const fishBatch = makeBatch(MAX_FISH + 32);
-const floatBatch = makeBatch(MAX_FLOATS + 6);
+const fishBatch = makeBatch(MAX_FISH + 32 + MAX_PELLETS);
+const floatBatch = makeBatch(MAX_FLOATS + 6 + MAX_PELLETS);
 const skyBatch = makeBatch(6);
 
 function drawTri() { gl.bindVertexArray(triVAO); gl.drawArrays(gl.TRIANGLES, 0, 3); }
@@ -1610,7 +1623,8 @@ function syncFloats() {
 }
 
 // ---------------------------------------------------------------- input
-const mouse = { x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, speed: 0, down: false, inside: false, has: false, lastMove: -99 };
+const mouse = { x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, speed: 0, down: false, inside: false, has: false, lastMove: -99,
+                downAt: 0, downX: 0, downY: 0, dragged: false, feeding: false };
 let time = 0;
 const drops = [];
 const strokes = [];   // finger lines in the sand
@@ -1636,6 +1650,7 @@ addEventListener('mousedown', e => {
   if (e.button !== 0) return;
   const [x, y] = toWorld(e);
   mouse.x = mouse.px = x; mouse.y = mouse.py = y; mouse.has = true; mouse.inside = true; mouse.down = true; mouse.lastMove = time;
+  mouse.downAt = time; mouse.downX = x; mouse.downY = y; mouse.dragged = false;
   splash(x, y, 1);
   addStroke(x, y, x, y, 0.006);
   if (S.sound) audioStart();
@@ -1650,6 +1665,7 @@ canvas.addEventListener('touchstart', e => {
   e.preventDefault();
   const [x, y] = touchAt(e);
   mouse.x = mouse.px = x; mouse.y = mouse.py = y; mouse.has = true; mouse.inside = true; mouse.down = true; mouse.lastMove = time;
+  mouse.downAt = time; mouse.downX = x; mouse.downY = y; mouse.dragged = false;
   splash(x, y, 1);
   addStroke(x, y, x, y, 0.006);
   if (S.sound) audioStart();
@@ -1707,6 +1723,54 @@ function updateInput(dt) {
     if (mouse.down) addStroke(mouse.px, mouse.py, mouse.x, mouse.y, 0.0045);
   }
   mouse.px = mouse.x; mouse.py = mouse.y;
+
+  // holding still on the water sprinkles fish food; moving away turns it back into a drag
+  if (mouse.down && Math.hypot(mouse.x - mouse.downX, mouse.y - mouse.downY) > 0.02) mouse.dragged = true;
+  const feeding = S.feed && mouse.down && !mouse.dragged && time - mouse.downAt > 0.35 && depthAt(mouse.x, mouse.y) > 0.03;
+  if (feeding && !mouse.feeding) {
+    // the splash from pressing scared them; food is worth coming back for
+    for (const f of fish) if (Math.hypot(f.x - mouse.x, f.y - mouse.y) < 0.7) f.fear = Math.min(f.fear, 0.1);
+  }
+  mouse.feeding = feeding;
+  if (feeding) {
+    feedAcc += dt;
+    while (feedAcc > 0.11) { feedAcc -= 0.11; dropFood(mouse.x, mouse.y); }
+  } else feedAcc = 0;
+}
+
+// ---------------------------------------------------------------- fish food
+let pellets = [];
+let feedAcc = 0;
+function dropFood(x, y) {
+  if (pellets.length >= MAX_PELLETS) return;
+  const a = rand(0, TAU), r = Math.sqrt(Math.random()) * 0.018;
+  const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
+  const t = Math.random();
+  pellets.push({ x: px, y: py, depth: 0, float: rand(0.6, 1.6), sink: rand(0.06, 0.1), rest: 0, len: rand(0.0075, 0.0095),
+                 ang: rand(0, TAU), vx: 0, vy: 0, col: t < 0.6 ? [0.64, 0.42, 0.20] : t < 0.85 ? [0.72, 0.34, 0.18] : [0.80, 0.62, 0.30] });
+  addDrop(px, py, px, py, 0.006, -0.05 * S.ripple);
+  if (S.sound && audio.ctx && audio.ctx.state === 'running' && Math.random() < 0.35)
+    hiss(audio.ctx.currentTime + Math.random() * 0.05, 'highpass', 3600, 0.7, 0.005, 0.08, 0.03);
+}
+function updatePellets(dt) {
+  const cur = world.current;
+  for (const p of pellets) {
+    if (p.float > 0) {
+      // floats a moment, drifting with the water, then soaks up and sinks
+      p.float -= dt;
+      p.vx += (cur[0] * 0.8 - p.vx) * Math.min(1, dt * 0.5); p.vy += (cur[1] * 0.8 - p.vy) * Math.min(1, dt * 0.5);
+    } else if (p.depth < 0.95) {
+      p.depth = Math.min(0.95, p.depth + p.sink * dt);
+      p.vx *= Math.exp(-dt * 0.8); p.vy *= Math.exp(-dt * 0.8);
+      p.vx += Math.sin(time * 1.3 + p.ang) * 0.002 * dt;      // a slow wobble on the way down
+    } else {
+      p.rest += dt;                                            // on the seabed: left for a while, then gone
+      p.vx = p.vy = 0;
+    }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.ang += dt * 0.3;
+  }
+  pellets = pellets.filter(p => !p.eaten && p.rest < 25);
 }
 
 // ---------------------------------------------------------------- behaviour
@@ -1782,9 +1846,34 @@ function updateFish(dt) {
         calm = d < ring * 2.5;
       }
     }
+    // food in the water: dart to the nearest crumb and snap it up
+    let chase = false;
+    if (f.chew > 0) f.chew -= dt;
+    if (f.fullT > 0) { f.fullT -= dt; if (f.fullT <= 0) f.appetite = rand(3, 7); }
+    if (f.appetite === undefined) f.appetite = rand(3, 7);
+    if (pellets.length && f.fear < 0.3 && !(f.chew > 0) && !(f.fullT > 0)) {
+      let best = null, bd = f.kind === 0 ? 0.45 : 0.6;
+      for (const p of pellets) {
+        if (p.eaten) continue;
+        const d = Math.hypot(p.x - f.x, p.y - f.y);
+        if (d < bd) { bd = d; best = p; }
+      }
+      if (best) {
+        const dx = best.x - f.x, dy = best.y - f.y, d = bd + 1e-5;
+        const want = f.cruise * (f.kind === 0 ? 3 : 2.2);
+        ax += (dx / d * want - f.vx) * 3; ay += (dy / d * want - f.vy) * 3;
+        chase = true;
+        if (d < f.len * 0.5) {
+          best.eaten = true;
+          if (best.depth < 0.25) addDrop(best.x, best.y, best.x, best.y, 0.007, -0.06 * S.ripple);
+          f.chew = rand(0.6, 1.4);                              // a moment to swallow
+          if (--f.appetite <= 0) f.fullT = rand(25, 45);       // had enough for now
+        }
+      }
+    }
     f.vx += ax * dt; f.vy += ay * dt;
     let sp = Math.hypot(f.vx, f.vy) + 1e-6;
-    const target = f.cruise * (1 + 3.5 * f.fear) * (calm ? 0.55 : 1);
+    const target = f.cruise * (1 + 3.5 * f.fear) * (calm ? 0.55 : 1) * (chase ? 2.4 : 1);
     const ns = sp + (target - sp) * Math.min(1, dt * (f.fear > 0.1 ? 3 : 0.9));
     f.vx *= ns / sp; f.vy *= ns / sp;
     f.x += f.vx * dt; f.y += f.vy * dt;
@@ -1807,6 +1896,14 @@ function updateRay(r, dt) {
       [r.tx, r.ty] = randomWaterPoint(k.minD + 0.1, k.maxD);
     }
     return;
+  }
+  if (r.kind === 2) {
+    for (const p of pellets) {
+      if (p.eaten || p.depth < 0.9) continue;
+      const pd = Math.hypot(p.x - r.x, p.y - r.y);
+      if (pd < 0.35) { r.tx = p.x; r.ty = p.y; }
+      if (pd < r.len * 0.3) p.eaten = true;
+    }
   }
   const dx = r.tx - r.x, dy = r.ty - r.y, d = Math.hypot(dx, dy) + 1e-4;
   const cruise = k.cruise * (1 + 2.5 * r.fear);
@@ -2059,6 +2156,8 @@ function packInstances() {
   d = fishBatch.data;
   for (const kind of [6, 9, 5]) for (const r of rays) if (r.kind === kind && r.away <= 0) put(r.x, r.y, r.ang, r.len, kind, r.phase, 0, r.depth ?? RAY_KINDS[kind].depth, r.col, r.extra);
   for (const j of jellies) put(j.x, j.y, j.ang, j.len, j.kind, j.phase, 0, j.depth, [1, 1, 1], j.extra);
+  // food still floating belongs to the surface layer (no water in front of it); once it sinks, to the fish layer
+  for (const p of pellets) if (p.depth > 0) put(p.x, p.y, p.ang, p.len, 12, 0, 0, p.depth, p.col, 0);
   for (const f of fish) if (f.kind === 1) put(f.x, f.y, f.ang, f.len, 1, f.phase, f.bend, f.depth, f.col, f.extra);
   for (const f of fish) if (f.kind === 0) put(f.x, f.y, f.ang, f.len, 0, f.phase, f.bend, f.depth, f.col, f.extra);
   fishBatch.count = n;
@@ -2073,6 +2172,7 @@ function packInstances() {
   n = floats.length;
   d = floatBatch.data;
   for (const c of crabs) put(c.x, c.y, c.ang, c.len, 10, c.phase, c.hide, 1, c.col, c.extra);
+  for (const p of pellets) if (p.depth === 0) put(p.x, p.y, p.ang, p.len, 12, 0, 0, 0, p.col, 0);
   floatBatch.count = n;
   n = 0;
   d = skyBatch.data;
@@ -2403,6 +2503,7 @@ function step(dt) {
   updateFish(dt);
   updateJellies(dt);
   updateCrabs(dt);
+  updatePellets(dt);
   updateGulls(dt);
   waveSounds();
   updateFloats(dt);
@@ -2471,6 +2572,7 @@ const PROPS = {
   tide: v => { S.tide = v === true || v === 'true'; },
   turtle: v => { S.turtle = v === true || v === 'true'; syncRays(); },
   beachLife: v => { S.beachLife = v === true || v === 'true'; syncCrabs(); },
+  feedFish: v => { S.feed = v === true || v === 'true'; },
   sound: v => { S.sound = v === true || v === 'true'; if (S.sound) audioStart(); audioLevel(); },
   volume: v => { S.volume = v / 100 * 0.8; audioLevel(); },
 };
@@ -2509,6 +2611,8 @@ window.sea = { splash: (x, y) => splash(x * aspect, 1 - y, 1), regenerate, setti
   stepFrame: dt => { stepping = true; if (floorDirty) renderFloor(); step(dt); return new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9)); },
   get floorBuilds() { return floorBuilds; },
   get paused() { return paused; },
+  get pellets() { return pellets; },
+  resetAppetite: () => { for (const f of fish) { f.appetite = rand(3, 7); f.fullT = 0; f.chew = 0; } },
   stopStepping: () => { stepping = false; },
   // drive the real loop with a made-up timestamp; true if it drew (lets the frame-rate cap be tested in a hidden tab)
   driveFrame: now => { const t0 = time; frame(now); return time !== t0; }, get fish() { return fish; }, mouse,

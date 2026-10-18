@@ -36,6 +36,7 @@ Wallpaper Engine has no buttons in its settings, so **New seabed** and **Show se
 | Click | A splash with rings of light; fish scatter and floating flowers drift away |
 | Press and drag | Like putting your hand in the water: bigger waves |
 | Press and drag on the sand | Write or draw with your finger; the next wave smooths it away |
+| Hold the mouse button still on the water | Sprinkles fish food: it floats, then slowly sinks, and the fish rush over to eat it (a stingray cleans up what reaches the bottom) |
 | Hold the cursor still | Curious little fish gather around it |
 | Go near a hermit crab | It pulls back into its shell, then carries on, leaving tiny footprints |
 | At night | Touching the water lights up glowing plankton; jellyfish and breaking surf glow |
@@ -49,7 +50,7 @@ Wallpaper Engine has no buttons in its settings, so **New seabed** and **Show se
 - **New seabed** and **fixed seabed number**: every start makes a new seabed; to keep one you like, use its number.
 - **Tides**: the sea rises and falls with real time, about every 12.4 hours, so the beach widens and narrows.
 - Caustic light, wave size and speed, mouse ripples, rain, cloud shadows.
-- Small fish, big fish, rays, sea turtle, jellyfish, hermit crabs & gulls, floating flowers & leaves.
+- Small fish, big fish, rays, sea turtle, jellyfish, hermit crabs & gulls, floating flowers & leaves, **feed the fish**.
 - **Wave sounds** (off by default) and **volume**: surf in step with the picture, and a plop when you tap the water.
 - **Save power when idle** (on by default): after 45 seconds without the mouse it drops to 30 FPS, and is back to full speed as soon as the mouse moves.
 - **Quality** and **limit to 30 FPS**: turn these down on a slow graphics card or on battery.
@@ -65,7 +66,7 @@ shallow-sea/
   sea.js                 all of the simulation and shaders
   LivelyInfo.json        wallpaper info for Lively
   LivelyProperties.json  Lively's Customise panel (the web settings panel reads it too)
-  project.json           the same settings for Wallpaper Engine, generated from LivelyProperties.json
+  project.json           the same settings for Wallpaper Engine (run `python tools/make_project_json.py` after changing LivelyProperties.json)
   thumbnail.jpg / preview.jpg / preview.gif / preview.webp   pictures for Lively and this README
 .github/workflows/pages.yml   publishes the web version to GitHub Pages on every push to main
 ```
@@ -118,6 +119,7 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 | 點一下 | 濺起水花、一圈圈擴散的光環；魚會四散，漂浮的花葉被推開 |
 | 按住拖曳 | 像把手伸進水裡，水波更大 |
 | 在沙灘上按住拖曳 | 用手指在沙上寫字、畫圖；浪沖上來時會把它抹平 |
+| 在水面上按住滑鼠不動 | 撒飼料：先浮在水面，再慢慢沉下去，魚會衝過來搶食（沉到底的會被藍點魟吃掉） |
 | 游標停著不動幾秒 | 好奇的小魚會慢慢游過來繞著游標 |
 | 靠近寄居蟹 | 牠會縮進殼裡，過幾秒才探出頭繼續爬，沿路留下小腳印 |
 | 晚上 | 碰到海水的地方會亮起藍色螢光浮游生物；水母和浪花也會發光 |
@@ -131,7 +133,7 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 - **重新產生海床／固定海床編號**：每次啟動都是新的一片；喜歡現在這片就把編號填進去
 - **潮汐**：照真實時間大約每 12.4 小時漲退一次
 - 光紋強度、波浪大小／速度、滑鼠漣漪強度、雨、雲影
-- 小魚數量、大魚、魟魚、海龜、水母數量、寄居蟹與海鷗、漂浮的花與葉
+- 小魚數量、大魚、魟魚、海龜、水母數量、寄居蟹與海鷗、漂浮的花與葉、**餵魚**
 - **海浪聲**（預設關閉）與**音量**
 - **閒置時省電**（預設開）：滑鼠 45 秒沒動就降到 30 FPS，一動馬上恢復
 - **畫質／鎖定 30 FPS**：顯示卡較弱或用電池時可以調低

@@ -206,6 +206,12 @@
         "value": true,
         "order": 320
       },
+      "feedfish": {
+        "type": "bool",
+        "text": "Feed the fish 餵魚",
+        "value": true,
+        "order": 330
+      },
       "jellycount": {
         "type": "slider",
         "text": "Jellyfish 水母數量",
@@ -214,7 +220,7 @@
         "value": 6,
         "fraction": false,
         "editable": true,
-        "order": 330
+        "order": 340
       },
       "floatcount": {
         "type": "slider",
@@ -224,13 +230,13 @@
         "value": 4,
         "fraction": false,
         "editable": true,
-        "order": 340
+        "order": 350
       },
       "sound": {
         "type": "bool",
         "text": "Wave sounds 海浪聲",
         "value": false,
-        "order": 360
+        "order": 370
       },
       "volume": {
         "type": "slider",
@@ -240,13 +246,13 @@
         "value": 60,
         "fraction": false,
         "editable": true,
-        "order": 370
+        "order": 380
       },
       "quality": {
         "type": "combo",
         "text": "Quality 畫質",
         "value": "0",
-        "order": 390,
+        "order": 400,
         "options": [
           {
             "label": "High (native resolution) 高（原生解析度）",
@@ -266,13 +272,13 @@
         "type": "bool",
         "text": "Save power when idle 閒置時省電",
         "value": true,
-        "order": 400
+        "order": 410
       },
       "fps30": {
         "type": "bool",
         "text": "Limit to 30 FPS 鎖定 30 FPS",
         "value": false,
-        "order": 410
+        "order": 420
       }
     }
   }
