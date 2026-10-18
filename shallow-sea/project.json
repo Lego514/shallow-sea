@@ -196,7 +196,7 @@
       },
       "turtle": {
         "type": "bool",
-        "text": "Sea turtle 海龜",
+        "text": "Sea turtles 海龜",
         "value": true,
         "order": 310
       },

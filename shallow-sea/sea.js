@@ -910,11 +910,12 @@ vec4 leaf(vec2 q, out float sha) {
   return vec4(col * a, a);
 }
 
-// green sea turtle seen from above, in body lengths: the carapace runs from x = -0.46 to 0.42, the head to 0.68.
-// Carapace outline: a teardrop, widest a little ahead of the middle
-float turtleShellW(float x) {
+// sea turtles seen from above, in body lengths: the carapace runs from x = -0.46 to 0.42, the head to about 0.68.
+// z.bend picks the species: 0 green, 1 hawksbill, 2 olive ridley.
+// Carapace outline: sh = (half width, how far forward the widest point sits, bluntness)
+float turtleShellW(float x, vec3 sh) {
   float t = clamp((x + 0.46) / 0.88, 0.0, 1.0);
-  return 0.37 * sqrt(max(sin(3.14159265 * pow(t, 1.357)), 0.0));
+  return sh.x * pow(max(sin(3.14159265 * pow(t, sh.y)), 0.0), sh.z);
 }
 // distance to the nearest border in a field of irregular scales, in cell units
 float scaleEdge(vec2 p) {
@@ -933,6 +934,7 @@ vec4 turtle(vec2 q, out float sha) {
   float ph = v_b.y, aa = fwidth(q.x) + v_blur, seed = v_c.w * 37.0;
   float ay = abs(q.y);
   vec2 qa = vec2(q.x, ay);
+  float hawk = step(0.5, v_b.z) * step(v_b.z, 1.5), ridley = step(1.5, v_b.z), green = 1.0 - hawk - ridley;
 
   // ---- skin: front flippers (long curved paddles rowing together), rear flippers, neck, head, a stub of tail
   float fa = mix(0.45, 1.7, 0.5 + 0.5 * sin(ph));
@@ -948,8 +950,11 @@ vec4 turtle(vec2 q, out float sha) {
   vec2 rr = qa - vec2(-0.36, 0.17);
   float rl = dot(rr, rd), rc = dot(rr, rn), rt = clamp(rl / 0.24, 0.0, 1.0);
   float dR = max(abs(rc + 0.01) - (0.06 * sqrt(max(1.0 - rt * rt, 0.0)) + 0.01 * (1.0 - rt)), max(-rl - 0.04, rl - 0.24));
-  float ry = 0.085 * (1.0 - 0.3 * smoothstep(0.52, 0.68, q.x));
-  float dH = (length(vec2((q.x - 0.55) / 0.125, q.y / ry)) - 1.0) * ry;
+  float ry = green * 0.085 * (1.0 - 0.3 * smoothstep(0.52, 0.68, q.x))
+           + hawk * 0.072 * (1.0 - 0.6 * smoothstep(0.5, 0.72, q.x))
+           + ridley * 0.1 * (1.0 - 0.4 * smoothstep(0.48, 0.68, q.x));
+  float hc = 0.55 + 0.03 * hawk, hrx = 0.125 + 0.03 * hawk + 0.005 * ridley;
+  float dH = (length(vec2((q.x - hc) / hrx, q.y / ry)) - 1.0) * ry;
   float dN = length(vec2(q.x - clamp(q.x, 0.34, 0.48), q.y)) - 0.065;
   float dT = max(ay - 0.03 * clamp((q.x + 0.56) / 0.12, 0.0, 1.0), max(q.x + 0.4, -0.56 - q.x));
   float dSkin = min(min(dF, dR), min(min(dH, dN), dT));
@@ -967,45 +972,71 @@ vec4 turtle(vec2 q, out float sha) {
   float onHead = step(dH, 0.0), onFlip = step(dF, 0.0) * (1.0 - onHead);
   float e = mix(mix(eG, eF, onFlip), eH, onHead), fw = mix(mix(fwG, fwF, onFlip), fwH, onHead);
   float border = mix(1.0 - smoothstep(0.02, 0.09, e), 0.25, smoothstep(0.25, 0.6, fw));     // blur out when tiny
-  vec3 kc = mix(vec3(0.3, 0.25, 0.17), vec3(0.66, 0.6, 0.43), border);
-  kc = mix(kc, vec3(0.62, 0.58, 0.44), smoothstep(-0.55, -0.95, fc / wTrail) * onFlip * 0.6);
+  vec3 kDark = green * vec3(0.3, 0.25, 0.17) + hawk * vec3(0.24, 0.14, 0.07) + ridley * vec3(0.27, 0.28, 0.21);
+  vec3 kPale = green * vec3(0.66, 0.6, 0.43) + hawk * vec3(0.78, 0.62, 0.34) + ridley * vec3(0.48, 0.49, 0.4);
+  vec3 kc = mix(kDark, kPale, border);
+  kc = mix(kc, kPale * 0.95, smoothstep(-0.55, -0.95, fc / wTrail) * onFlip * 0.6);
   kc *= 0.8 + 0.2 * smoothstep(0.0, -0.025, dSkin);                                           // rounded edges
   kc = mix(kc, vec3(0.12, 0.1, 0.08), smoothstep(0.013, 0.007, length(vec2(fl - 0.17, fc - 0.05))) * onFlip);  // claw
+  kc = mix(kc, vec3(0.12, 0.1, 0.08), smoothstep(0.012, 0.006, length(vec2(fl - 0.25, fc - 0.045))) * onFlip * hawk);  // hawksbill: a second
   kc = mix(kc, vec3(0.06), smoothstep(0.016, 0.009, length(vec2((q.x - 0.565) / 1.4, ay - 0.074))) * smoothstep(0.02, -0.01, dH));  // eyes
 
   // ---- carapace
-  float hw = turtleShellW(q.x);
-  float slope = (turtleShellW(q.x + 0.005) - turtleShellW(q.x - 0.005)) / 0.01;
+  vec3 shp = green * vec3(0.37, 1.357, 0.5) + hawk * vec3(0.33, 1.2, 0.62) + ridley * vec3(0.41, 1.05, 0.42);
+  float ang = atan(q.y / shp.x, (q.x + 0.02) / 0.44), seg = ang * 24.0 / 6.2831853;
+  float hw = turtleShellW(q.x, shp);
+  float slope = (turtleShellW(q.x + 0.005, shp) - turtleShellW(q.x - 0.005, shp)) / 0.01;
+  hw -= hawk * 0.016 * abs(fract(seg) - 0.5) * 2.0 * smoothstep(-0.1, -0.25, q.x);              // saw-toothed back edge
   float dS = max((ay - hw) / sqrt(1.0 + slope * slope), max(q.x - 0.42, -0.46 - q.x));
   float shell = smoothstep(aa, -aa, dS);
   float rim = smoothstep(-0.058, -0.052, dS);                       // the ring of small marginal plates
-  float ang = atan(q.y / 0.37, (q.x + 0.02) / 0.44), seg = ang * 24.0 / 6.2831853;
   float dMs = (0.5 - abs(fract(seg) - 0.5)) * 6.2831853 / 24.0 * 0.4;
   float dMi = abs(dS + 0.055);
   // five vertebral plates down the spine (six-sided), four costal plates either side, their seams slanting back
-  float vu = (0.33 - q.x) / 0.152, vk = floor(vu), vf = vu - vk;
-  float inRow = step(0.0, vu) * step(vu, 5.0);
+  float nV = 5.0 + ridley, vsp = 0.76 / nV;
+  float vu = (0.33 - q.x) / vsp, vk = floor(vu), vf = vu - vk;
+  float inRow = step(0.0, vu) * step(vu, nV);
   float vb = 0.085 + 0.04 * (1.0 - abs(2.0 * vf - 1.0));
   float inV = step(ay, vb) * inRow;
-  float dVb = mix(9.0, abs(ay - vb), inRow), dVs = (0.5 - abs(fract(vu + 0.5) - 0.5)) * 0.152;
-  float cpos = q.x + 0.3 * (ay - 0.1);
-  float dCs = min(min(abs(cpos - 0.16), abs(cpos + 0.02)), abs(cpos + 0.2)) / 1.044;
+  float dVb = mix(9.0, abs(ay - vb), inRow), dVs = (0.5 - abs(fract(vu + 0.5) - 0.5)) * vsp;
+  float cpos = q.x + 0.3 * (ay - 0.1) - ridley * 0.025 * sign(q.y);
+  float dCs = 9.0;
+  for (int k = 0; k < 5; k++) {
+    float cs = ridley > 0.5 ? 0.2 - 0.12 * float(k) : (k < 3 ? 0.16 - 0.18 * float(k) : 99.0);
+    dCs = min(dCs, abs(cpos - cs));
+  }
+  dCs /= 1.044;
   float dSeam = mix(mix(min(dVb, dCs), min(dVb, dVs), inV), min(dMs, dMi), rim);
   float sw = max(0.0035, aa * 0.8);
   float seam = smoothstep(sw * 1.6, sw * 0.5, min(dSeam, dMi));
   // each plate grows outward from a point near its back edge, leaving a sunburst of light and dark streaks
   float ck = cpos > 0.16 ? 0.27 : cpos > -0.02 ? 0.07 : cpos > -0.2 ? -0.11 : -0.31;
-  vec2 gc = inV > 0.5 ? vec2(0.33 - (vk + 0.72) * 0.152, 0.0) : vec2(ck - 0.063, 0.21);
+  if (ridley > 0.5) ck = 0.26 - 0.12 * clamp(floor((0.2 - cpos) / 0.12) + 1.0, 0.0, 5.0);
+  vec2 gc = inV > 0.5 ? vec2(0.33 - (vk + 0.72) * vsp, 0.0) : vec2(ck - 0.063, 0.21);
   vec2 rg = qa - gc;
   float burst = sin(atan(rg.y, rg.x) * 5.0 + 3.5 * gnoise(qa * 5.0 + seed) + length(rg) * 8.0) + 0.5 * gnoise(qa * 11.0 - seed);
   burst = mix(burst, sin(seg * 6.2831853 * 2.0 + 2.5 * gnoise(qa * 8.0 + seed)), rim * 0.7);
   float lightS = smoothstep(-0.4, 1.0, burst) * mix(smoothstep(0.0, 0.05, length(rg)), 1.0, rim);
   vec3 base = v_c.rgb;
-  vec3 sc = mix(base * vec3(0.72, 0.7, 0.66), base * vec3(1.3, 1.28, 1.15) + vec3(0.05, 0.04, 0.0), lightS * 0.6);
-  sc = mix(sc, base * 0.5, smoothstep(0.1, 0.6, gnoise(qa * 3.5 + seed * 1.3)) * 0.4);        // darker blotches
+  vec3 scG = mix(base * vec3(0.72, 0.7, 0.66), base * vec3(1.3, 1.28, 1.15) + vec3(0.05, 0.04, 0.0), lightS * 0.6);
+  scG = mix(scG, base * 0.5, smoothstep(0.1, 0.6, gnoise(qa * 3.5 + seed * 1.3)) * 0.4);      // darker blotches
+  // tortoiseshell: each plate fans out from its growth point in rays of amber and dark brown over warm brown
+  float hb = 0.7 * sin(atan(rg.y, rg.x) * 4.0 + 3.5 * gnoise(qa * 4.0 + seed) + length(rg) * 5.0) + 0.8 * gnoise(qa * 6.0 - seed);
+  hb = mix(hb, 0.9 * sin(seg * 6.2831853 * 1.5 + 3.0 * gnoise(qa * 6.0 + seed)), rim * 0.6);
+  vec3 scH = mix(vec3(0.28, 0.14, 0.06), base, smoothstep(-0.9, 0.3, hb));                        // dark brown into warm brown
+  scH = mix(scH, vec3(0.86, 0.58, 0.24), smoothstep(0.45, 1.2, hb) * 0.85 * mix(smoothstep(0.0, 0.06, length(rg)), 1.0, rim));  // amber fans
+  scH = mix(scH, vec3(0.14, 0.07, 0.03), smoothstep(-0.9, -1.4, hb) * 0.6);                     // darkest streaks
+  // plates overlap like roof tiles: a shadow just behind each seam, the overlapping edge catching the light
+  float cfr = fract((0.16 - cpos) / 0.18), inC = (1.0 - inV) * (1.0 - rim) * step(-0.38, cpos) * step(cpos, 0.34);
+  float tile = smoothstep(0.2, 0.0, vf) * inV + smoothstep(0.18, 0.0, cfr) * inC;
+  float edge = smoothstep(0.93, 1.0, vf) * inV + smoothstep(0.94, 1.0, cfr) * inC;
+  scH = scH * (1.0 - 0.35 * tile) + vec3(0.22, 0.15, 0.06) * edge;
+  vec3 scR = base * (0.8 + 0.3 * gnoise(qa * 5.0 + seed)) * (0.85 + 0.25 * lightS);
+  vec3 sc = green * scG + hawk * scH + ridley * scR;
   float nzS = sqrt(max(1.0 - pow(ay / max(hw, 0.05), 2.0), 0.0));
-  sc *= 0.7 + 0.4 * nzS;                                                                        // domed
-  sc = mix(sc, vec3(0.6, 0.56, 0.44) * (0.7 + 0.4 * nzS), seam * 0.4 * smoothstep(0.014, 0.005, aa));   // pale seams, fading when small
+  sc *= mix(0.7 + 0.4 * nzS, 0.82 + 0.25 * nzS, ridley);                                       // domed (the ridley flatter)
+  vec3 seamC = mix(vec3(0.6, 0.56, 0.44), vec3(0.16, 0.08, 0.04), hawk) * (0.7 + 0.4 * nzS);       // pale seams; dark on the hawksbill
+  sc = mix(sc, seamC, seam * mix(0.4, 0.7, hawk) * smoothstep(0.014, 0.005, aa));
   sc += vec3(0.25) * smoothstep(0.15, 0.03, v_b.w) * pow(nzS, 6.0) * 0.5;                     // wet sheen near the surface
 
   vec4 c = over(vec4(sc, 1.0) * shell, vec4(kc, 1.0) * skin);
@@ -1842,15 +1873,32 @@ function syncFish() {
   fish.push(...small);
 }
 
+// sea turtles: green, hawksbill (tortoiseshell, serrated shell, hooked beak), olive ridley (small, round, plain olive)
+const TURTLE_SPECIES = [
+  { sp: 0, w: 0.45, len: [0.14, 0.16], col: [0.42, 0.33, 0.18] },
+  { sp: 1, w: 0.3, len: [0.12, 0.135], col: [0.6, 0.33, 0.12] },
+  { sp: 2, w: 0.25, len: [0.105, 0.12], col: [0.32, 0.34, 0.22] },
+];
+function pickTurtle(r) {
+  let u = Math.random(), t = TURTLE_SPECIES[0];
+  for (const c of TURTLE_SPECIES) { if (u < c.w) { t = c; break; } u -= c.w; }
+  r.sp = t.sp; r.len = rand(t.len[0], t.len[1]); r.col = t.col; r.extra = Math.random();
+}
 function newRay(kind) {
   const k = RAY_KINDS[kind];
   const [x, y] = randomWaterPoint(k.minD + 0.05, k.maxD), [tx, ty] = randomWaterPoint(k.minD + 0.1, k.maxD);
-  return { kind, x, y, tx, ty, ang: Math.atan2(ty - y, tx - x), vx: 0, vy: 0, len: k.len, phase: rand(0, TAU),
-           fear: 0, away: 0, col: k.col, extra: Math.random() };
+  const r = { kind, x, y, tx, ty, ang: Math.atan2(ty - y, tx - x), vx: 0, vy: 0, len: k.len, phase: rand(0, TAU),
+              fear: 0, away: 0, col: k.col, extra: Math.random() };
+  if (kind === 9) pickTurtle(r);
+  return r;
 }
 function syncRays() {
-  const want = [...(S.rays ? [2, 5, 6] : []), ...(S.turtle ? [9] : [])];
-  rays = want.map(kind => rays.find(r => r.kind === kind) || newRay(kind));
+  const want = [...(S.rays ? [2, 5, 6] : []), ...(S.turtle ? [9, 9] : [])];
+  const pool = rays.slice(), had = pool.filter(r => r.kind === 9).length;
+  rays = want.map(kind => { const i = pool.findIndex(r => r.kind === kind); return i >= 0 ? pool.splice(i, 1)[0] : newRay(kind); });
+  // a second turtle turns up a while after the first
+  const turtles = rays.filter(r => r.kind === 9);
+  if (turtles.length === 2 && had < 2) turtles[1].away = rand(15, 45);
 }
 
 // hermit crabs wander the dry sand; gulls cross now and then
@@ -2189,6 +2237,7 @@ function updateRay(r, dt) {
     if (r.away <= 0) {
       [r.x, r.y] = offscreenSeaPoint(k.minD, 0.35);
       [r.tx, r.ty] = randomWaterPoint(k.minD + 0.1, k.maxD);
+      if (r.kind === 9) pickTurtle(r);               // whoever swims in next may be a different turtle
     }
     return;
   }
@@ -2702,7 +2751,7 @@ function packInstances() {
   deepBatch.count = n;
   n = 0;
   d = fishBatch.data;
-  for (const kind of [6, 9, 5]) for (const r of rays) if (r.kind === kind && r.away <= 0) put(r.x, r.y, r.ang, r.len, kind, r.phase, 0, r.depth ?? RAY_KINDS[kind].depth, r.col, r.extra);
+  for (const kind of [6, 9, 5]) for (const r of rays) if (r.kind === kind && r.away <= 0) put(r.x, r.y, r.ang, r.len, kind, r.phase, r.sp || 0, r.depth ?? RAY_KINDS[kind].depth, r.col, r.extra);
   for (const j of jellies) put(j.x, j.y, j.ang, j.len, j.kind, j.phase, 0, j.depth, [1, 1, 1], j.extra);
   // food still floating belongs to the surface layer (no water in front of it); once it sinks, to the fish layer
   for (const p of pellets) if (p.depth > 0) put(p.x, p.y, p.ang, p.len, 12, 0, 0, p.depth, p.col, 0);

@@ -134,8 +134,8 @@
   "turtle": {
     "type": "checkbox",
     "value": true,
-    "text": "Sea turtle 海龜",
-    "help": "Swims by from deep water now and then, coming up to breathe. 偶爾從深水游過來，不時浮上水面換氣"
+    "text": "Sea turtles 海龜",
+    "help": "Green, hawksbill and olive ridley turtles swim by from deep water now and then, coming up to breathe. 綠蠵龜、玳瑁和欖蠵龜不時從深水游過來，會浮上水面換氣"
   },
   "dolphins": {
     "type": "checkbox",
