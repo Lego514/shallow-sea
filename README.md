@@ -2,7 +2,7 @@
 
 ![Shallow Sea](shallow-sea/preview.webp)
 
-An interactive tropical shore seen from above. Waves come in sets and wash up the beach, the water deepens from clear shallows through turquoise to deep blue, and fish, rays, sea turtles and jellyfish swim through it, with a pod of dolphins passing now and then. Everything is rendered live in WebGL2. It runs as a desktop wallpaper in [Lively Wallpaper](https://github.com/rocksdanister/lively) on Windows, or in any browser, phones included.
+An interactive tropical shore seen from above. Waves come in sets and wash up the beach, the water deepens from clear shallows over coral reefs and turquoise to deep blue, and fish, rays, sea turtles and jellyfish swim through it, with a pod of dolphins passing now and then. Everything is rendered live in WebGL2. It runs as a desktop wallpaper in [Lively Wallpaper](https://github.com/rocksdanister/lively) on Windows, or in any browser, phones included.
 
 **Play it in your browser: <https://lego514.github.io/shallow-sea/>** — the gear in the bottom-right corner opens the settings (English or 中文).
 
@@ -51,7 +51,7 @@ Wallpaper Engine has no buttons in its settings, so **New seabed** and **Show se
 - **New seabed** and **fixed seabed number**: every start makes a new seabed; to keep one you like, use its number.
 - **Tides**: the sea rises and falls with real time, about every 12.4 hours, so the beach widens and narrows.
 - Caustic light, wave size and speed, mouse ripples, rain, cloud shadows.
-- Small fish, big fish, rays, sea turtles (green, hawksbill, olive ridley), **dolphins**, jellyfish, hermit crabs & gulls, **turtle hatchlings**, floating flowers & leaves, **feed the fish**.
+- **Corals**, small fish, big fish, rays, sea turtles (green, hawksbill, olive ridley), **dolphins**, jellyfish, hermit crabs & gulls, **turtle hatchlings**, floating flowers & leaves, **feed the fish**.
 - **Wave sounds** (off by default) and **volume**: surf in step with the picture, and a plop when you tap the water.
 - **Save power when idle** (on by default): after 45 seconds without the mouse it drops to 30 FPS, and is back to full speed as soon as the mouse moves.
 - **Quality** and **limit to 30 FPS**: turn these down on a slow graphics card or on battery.
@@ -88,6 +88,7 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 - **Waves on the beach**: the coastline is baked into a coordinate map. Each wave has its own size (they come in sets), arrival time and angle, and every pixel tracks the latest four: the swell travels at √depth, breaks where its height says it should, slows as it runs up the sand and speeds up as it drains. From that the shader works out whether the sand is covered, how thick and how old the foam is, and how wet the sand is. The swell's curvature also feeds the caustics.
 - **Water surface**: ten analytic wind waves plus a GPU height-field simulation for the ripples made by the mouse, rain, fish and floating things.
 - **Caustics**: for each point on the seabed the shader finds which surface point refracted the sunlight there; brightness is 1 / |det| of the refraction map's Jacobian, so your ripples cast matching rings of light on the sand.
+- **Coral reefs**: in patches at middle depths a bed of coral rubble is crowded with brain, table, staghorn, boulder and cauliflower corals, each casting a shadow and raising the seabed so the light patterns and ripples follow them. They are drawn into the seabed once, when it is built.
 - **Sea life**: small silver-flanked fish school as boids (flashing as they turn), big fish roam alone (a yellow tang, a sergeant major, a bluefin trevally), a blue-spotted stingray rests on the shallow sand, an eagle ray and a manta fly through the water, green, hawksbill and olive ridley turtles drift by and surface to breathe (each arrival may be a different species: the hawksbill with its tortoiseshell and serrated shell, the small, round, plain olive ridley), every few minutes a pod of bottlenose dolphins crosses the deep water in formation (each one rising to breathe in turn, now and then one leaping clear of the water and crashing back in, scattering the fish), moon jellies (four lilac horseshoe gonads) and striped sea nettles trailing their tentacles pulse along in deeper water. All are drawn as signed-distance shapes and cast shadows along the refracted sun direction.
 
 ## License
@@ -98,7 +99,7 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 
 ## 中文說明
 
-從正上方看下去的一段熱帶海岸：浪一組一組沖上沙灘，海水從清澈的淺水、土耳其藍漸層到深藍色；魚群、魟魚、海龜（綠蠵龜、玳瑁、欖蠵龜）和水母在裡面游，偶爾還有一群海豚經過，有時會躍出水面。全部用 WebGL2 即時運算，可以當 Windows 上 [Lively Wallpaper](https://github.com/rocksdanister/lively) 的桌布，也可以直接在瀏覽器（含手機）玩。
+從正上方看下去的一段熱帶海岸：浪一組一組沖上沙灘，海水從清澈的淺水、珊瑚礁、土耳其藍漸層到深藍色；魚群、魟魚、海龜（綠蠵龜、玳瑁、欖蠵龜）和水母在裡面游，偶爾還有一群海豚經過，有時會躍出水面。全部用 WebGL2 即時運算，可以當 Windows 上 [Lively Wallpaper](https://github.com/rocksdanister/lively) 的桌布，也可以直接在瀏覽器（含手機）玩。
 
 **線上玩：<https://lego514.github.io/shallow-sea/>**（右下角齒輪可以調設定、切換中文／English）
 
@@ -135,7 +136,7 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 - **重新產生海床／固定海床編號**：每次啟動都是新的一片；喜歡現在這片就把編號填進去
 - **潮汐**：照真實時間大約每 12.4 小時漲退一次
 - 光紋強度、波浪大小／速度、滑鼠漣漪強度、雨、雲影
-- 小魚數量、大魚、魟魚、海龜（三種）、**海豚**、水母數量、寄居蟹與海鷗、**小海龜孵化**、漂浮的花與葉、**餵魚**
+- **珊瑚**、小魚數量、大魚、魟魚、海龜（三種）、**海豚**、水母數量、寄居蟹與海鷗、**小海龜孵化**、漂浮的花與葉、**餵魚**
 - **海浪聲**（預設關閉）與**音量**
 - **閒置時省電**（預設開）：滑鼠 45 秒沒動就降到 30 FPS，一動馬上恢復
 - **畫質／鎖定 30 FPS**：顯示卡較弱或用電池時可以調低

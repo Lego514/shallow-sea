@@ -194,35 +194,41 @@
         "value": true,
         "order": 300
       },
+      "corals": {
+        "type": "bool",
+        "text": "Corals 珊瑚",
+        "value": true,
+        "order": 310
+      },
       "turtle": {
         "type": "bool",
         "text": "Sea turtles 海龜",
         "value": true,
-        "order": 310
+        "order": 320
       },
       "dolphins": {
         "type": "bool",
         "text": "Dolphins 海豚",
         "value": true,
-        "order": 320
+        "order": 330
       },
       "beachlife": {
         "type": "bool",
         "text": "Hermit crabs & gulls 寄居蟹與海鷗",
         "value": true,
-        "order": 330
+        "order": 340
       },
       "hatchlings": {
         "type": "bool",
         "text": "Turtle hatchlings 小海龜孵化",
         "value": true,
-        "order": 340
+        "order": 350
       },
       "feedfish": {
         "type": "bool",
         "text": "Feed the fish 餵魚",
         "value": true,
-        "order": 350
+        "order": 360
       },
       "jellycount": {
         "type": "slider",
@@ -232,7 +238,7 @@
         "value": 6,
         "fraction": false,
         "editable": true,
-        "order": 360
+        "order": 370
       },
       "floatcount": {
         "type": "slider",
@@ -242,13 +248,13 @@
         "value": 4,
         "fraction": false,
         "editable": true,
-        "order": 370
+        "order": 380
       },
       "sound": {
         "type": "bool",
         "text": "Wave sounds 海浪聲",
         "value": false,
-        "order": 390
+        "order": 400
       },
       "volume": {
         "type": "slider",
@@ -258,13 +264,13 @@
         "value": 60,
         "fraction": false,
         "editable": true,
-        "order": 400
+        "order": 410
       },
       "quality": {
         "type": "combo",
         "text": "Quality 畫質",
         "value": "0",
-        "order": 420,
+        "order": 430,
         "options": [
           {
             "label": "High (native resolution) 高（原生解析度）",
@@ -284,13 +290,13 @@
         "type": "bool",
         "text": "Save power when idle 閒置時省電",
         "value": true,
-        "order": 430
+        "order": 440
       },
       "fps30": {
         "type": "bool",
         "text": "Limit to 30 FPS 鎖定 30 FPS",
         "value": false,
-        "order": 440
+        "order": 450
       }
     }
   }

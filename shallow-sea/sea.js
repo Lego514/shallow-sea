@@ -53,6 +53,7 @@ const S = {
   rays: true,
   jellies: 6,
   turtle: true,
+  corals: true,                // coral reefs on the seabed
   beachLife: true,
   hatchlings: true,            // on some nights a nest of sea turtles hatches on the beach
   feed: true,                  // hold still on the water to sprinkle fish food
@@ -274,6 +275,7 @@ uniform float u_px;
 uniform vec2 u_s0, u_s1, u_s2, u_s3;
 uniform float u_ang;
 uniform vec2 u_slope;
+uniform float u_coral;
 ${NOISE}${SHORE}
 const vec3 LDIR = vec3(-0.42, 0.50, 0.76);
 
@@ -285,6 +287,8 @@ float ripplePhase(vec2 p) {
 float rippleProf(float ph) { float s = 0.5 + 0.5 * sin(ph + 0.6 * sin(ph)); return s * s; }
 float rockField(vec2 p) { return fbm(p * 1.15 + u_s3) + 0.16 * gnoise(p * 8.0 + u_s0); }
 float ripAmount(vec2 p) { return smoothstep(-0.30, 0.20, fbm(p * 0.8 + u_s0)); }
+// where the reefs grow: a cheap two-octave field (it is looked up for every nearby coral cell)
+float reefField(vec2 p) { return 0.65 * gnoise(p * 1.1 + u_s1 * 1.7 + 4.0) + 0.3 * gnoise(p * 2.6 - u_s3 * 1.3); }
 
 // water depth in screen heights, negative on the beach; s is the coast coordinate
 float depthAt(vec2 p, out float s) {
@@ -410,7 +414,93 @@ void main() {
     }
   }
 
-  float open = (1.0 - rock) * (1.0 - dens * 0.9);
+  // coral reefs: in patches at the clear middle depths a bed of coral rubble, crowded with colonies of every shape
+  float coral = 0.0, coralH = 0.0;
+  if (u_coral > 0.5) {
+    float depthOK = smoothstep(0.2, 0.34, D) * smoothstep(1.7, 1.2, D);
+    float reefZ = smoothstep(-0.05, 0.3, reefField(p)) * depthOK;
+    // the rubble bed: broken coral and rock, crusted with algae
+    float rn1 = gnoise(p * 70.0 + u_s0), rn2 = gnoise(p * 23.0 - u_s2);
+    vec3 rub = mix(vec3(0.64, 0.6, 0.5), vec3(0.47, 0.46, 0.34), smoothstep(-0.3, 0.5, rn2));
+    rub *= 0.82 + 0.25 * smoothstep(-0.5, 0.6, rn1);
+    rub = mix(rub, vec3(0.36, 0.42, 0.26), smoothstep(0.25, 0.6, gnoise(p * 9.0 + u_s3)) * 0.5);
+    col = mix(col, rub * mix(1.0, lam, 0.9), smoothstep(0.15, 0.5, reefZ) * 0.85);
+
+    const float cs = 0.048;
+    vec2 ci = floor(p / cs);
+    for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+      vec2 c = ci + vec2(float(i), float(j));
+      vec2 h = hash22(c + u_s3 * 4.0 + 11.0), h2 = hash22(c + 23.1), h3 = hash22(c + 51.7);
+      vec2 center = (c + 0.15 + 0.7 * h2) * cs;
+      float kind = floor(fract(h.y * 9.13) * 5.0);   // 0 brain, 1 table, 2 staghorn, 3 boulder, 4 cauliflower
+      float r = (0.012 + 0.024 * h3.x) * (kind == 1.0 ? 1.4 : 1.0);
+      if (length(p - center) > r * 2.0) continue;     // too far away to touch this pixel or its shadow
+      if (h.x > smoothstep(-0.05, 0.3, reefField(center)) * 0.97) continue;
+      mat2 R = rot(h3.y * 6.2831853);
+      vec2 d = R * (p - center), dn = d / r;
+      float sd = c.x * 1.7 + c.y * 3.1, pal = fract(h2.x * 7.7);
+      // the few noise lookups every kind shares: an uneven outline, a rough edge, and two texture scales
+      float wob = gnoise(dn * 1.8 + sd), rough = gnoise(dn * 9.0 + sd);
+      float f1 = kind < 0.5 ? 5.0 : kind < 1.5 ? 3.0 : kind < 3.5 ? 34.0 : 16.0;
+      float t1 = gnoise(dn * f1 + sd), t2 = gnoise(dn * f1 * 2.0 - sd);
+      float ed = length(dn * vec2(1.0, kind < 0.5 ? 1.15 : 1.0)) + 0.13 * wob + 0.06 * rough;
+      float hgt = sqrt(max(1.0 - ed * ed, 0.0));
+      vec3 rnm = normalize(vec3(dn * 0.9 + 0.35 * vec2(t1, t2) * step(2.5, kind), hgt + 0.2));
+      float shOff = 0.55, shStr = 0.4;
+      vec3 cc;
+      if (kind < 0.5) {
+        // brain coral: a dome covered in meandering ridges and grooves
+        vec3 base = pal < 0.4 ? vec3(0.70, 0.60, 0.40) : pal < 0.75 ? vec3(0.55, 0.57, 0.36) : vec3(0.56, 0.44, 0.30);
+        cc = base * (1.08 - 0.5 * smoothstep(0.12, 0.0, abs(t1 + 0.35 * t2)));
+      } else if (kind < 1.5) {
+        // table coral: a flat plate on a short stalk, fine branchlets radiating out to a rim of paler tips
+        hgt = 0.35 * smoothstep(1.0, 0.85, ed);
+        rnm = vec3(0.0, 0.0, 1.0);
+        vec3 base = pal < 0.5 ? vec3(0.76, 0.70, 0.56) : pal < 0.8 ? vec3(0.60, 0.52, 0.38) : vec3(0.58, 0.64, 0.50);
+        cc = base * (0.82 + 0.22 * (0.5 + 0.5 * sin(atan(dn.y, dn.x) * 60.0 + 5.0 * t1))) * (0.9 + 0.12 * ed);
+        cc = mix(cc, pal < 0.3 ? vec3(0.66, 0.62, 0.80) : vec3(0.88, 0.84, 0.74), smoothstep(0.75, 0.95, ed) * step(0.3, rough) * 0.6);
+        shOff = 1.0; shStr = 0.5;
+      } else if (kind < 2.5) {
+        // staghorn coral: antler branches; only the one nearest this pixel (and its side shoot) needs drawing
+        float th = atan(dn.y, dn.x), sec = floor(th / 0.8976 + 0.5);
+        float an = sec * 0.8976 + 0.5 * (hash21(c + sec) - 0.5), ln = 0.65 + 0.4 * hash21(c + sec + 9.0);
+        vec2 dir = vec2(cos(an), sin(an));
+        float t = clamp(dot(dn, dir) / ln, 0.0, 1.0);
+        float best = length(dn - dir * ln * t) - mix(0.14, 0.08, t), tipT = t;
+        float an2 = an + (hash21(c + sec + 3.0) > 0.5 ? 0.6 : -0.6);
+        vec2 o2 = dir * ln * 0.5, dir2 = vec2(cos(an2), sin(an2));
+        float t2b = clamp(dot(dn - o2, dir2) / (ln * 0.45), 0.0, 1.0);
+        float dd2 = length(dn - o2 - dir2 * ln * 0.45 * t2b) - mix(0.1, 0.07, t2b);
+        if (dd2 < best) { best = dd2; tipT = mix(0.5, 1.0, t2b); }
+        ed = 1.0 + best * 4.0;
+        hgt = 0.6 * smoothstep(0.05, -0.05, best);
+        rnm = vec3(0.0, 0.0, 1.0);
+        vec3 base = pal < 0.6 ? vec3(0.64, 0.50, 0.34) : vec3(0.55, 0.47, 0.38);
+        vec3 tipC = pal < 0.3 ? vec3(0.62, 0.68, 0.88) : vec3(0.90, 0.87, 0.78);
+        cc = mix(base, tipC, smoothstep(0.7, 1.0, tipT)) * (0.78 + 0.3 * smoothstep(0.0, -0.06, best));
+        shStr = 0.3;
+      } else if (kind < 3.5) {
+        // boulder coral: a lumpy mound with a fine skin of polyps
+        vec3 base = pal < 0.45 ? vec3(0.76, 0.66, 0.42) : pal < 0.8 ? vec3(0.56, 0.50, 0.34) : vec3(0.56, 0.47, 0.54);
+        cc = base * (0.86 + 0.2 * smoothstep(0.1, 0.5, t1));
+      } else {
+        // cauliflower coral: a rounded clump of knobbly branches
+        hgt *= 0.8;
+        vec3 base = pal < 0.4 ? vec3(0.78, 0.56, 0.54) : pal < 0.75 ? vec3(0.62, 0.47, 0.36) : vec3(0.84, 0.80, 0.68);
+        cc = base * (0.7 + 0.4 * smoothstep(-0.2, 0.6, t1));
+      }
+      // its shadow on the ground, then the colony itself
+      float a = smoothstep(1.0, 1.0 - u_px / r * 2.0, ed) * depthOK;
+      vec2 ds = (d - R * sdir * r * shOff * 0.6) / r;
+      col *= 1.0 - smoothstep(1.25, 0.75, length(ds)) * shStr * depthOK * (1.0 - a);
+      if (a <= 0.0) continue;
+      col = mix(col, cc * (0.6 + 0.5 * max(dot(rnm, vec3(R * L.xy, L.z)), 0.0)), a);
+      coral = max(coral, a);
+      coralH = max(coralH, hgt * min(r / 0.03, 1.0) * a);
+    }
+  }
+
+  float open = (1.0 - max(rock, coral)) * (1.0 - dens * 0.9);
 
   // pebbles and shells
   {
@@ -485,7 +575,7 @@ void main() {
       float ths = atan(ds.y, ds.x) + a0;
       float edgeS = Rr * (0.30 + 0.70 * pow(0.5 + 0.5 * cos(5.0 * ths), 2.2));
       float shadow = smoothstep(Rr * 0.12, -Rr * 0.12, length(ds) - edgeS);
-      float m = (1.0 - rock) * smoothstep(0.03, 0.1, D);
+      float m = (1.0 - max(rock, coral)) * smoothstep(0.03, 0.1, D);
       col *= 1.0 - 0.35 * shadow * m;
       float a = smoothstep(u_px, -u_px, rr - edge) * m;
       float k = fract(h.y * 4.7);
@@ -498,6 +588,7 @@ void main() {
     }
   }
 
+  rockH = max(rockH, coralH * 0.9);
   if (u_shore.z <= 0.0) D = clamp(D - rockH * 0.16, 0.12, 1.0);
   else if (s > 0.0) D = max(D - rockH * 0.16, 0.01);
   o = vec4(col, D);
@@ -1765,6 +1856,7 @@ function renderFloor() {
   gl.uniform1f(u.u_ang, world.ang);
   gl.uniform2f(u.u_slope, world.slope[0], world.slope[1]);
   gl.uniform3fv(u.u_shore, shoreParams());
+  gl.uniform1f(u.u_coral, S.corals ? 1 : 0);
   drawTri();
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, coastT.fbo);
@@ -3224,6 +3316,7 @@ const PROPS = {
   waterColor: v => { S.water = hexToRgb(v); },
   deepColor: v => { S.deep = hexToRgb(v); },
   shore: v => { if ((v | 0) === S.shore) return; S.shore = v | 0; requestFloor(); },
+  corals: v => { const on = v === true || v === 'true'; if (on === S.corals) return; S.corals = on; requestFloor(); },
   causticStrength: v => { S.caustic = v / 100; },
   waveStrength: v => { S.waves = v / 100; },
   waveSpeed: v => { S.speed = v / 100; },

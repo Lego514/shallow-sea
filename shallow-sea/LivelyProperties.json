@@ -131,6 +131,12 @@
     "text": "Rays 魟魚",
     "help": "A blue-spotted stingray rests on the sand; an eagle ray and a manta fly through the water. 藍點魟趴在沙上，斑點鷹魟和鬼蝠魟在水中拍翅膀游"
   },
+  "corals": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Corals 珊瑚",
+    "help": "Reefs of brain, table, staghorn, boulder and cauliflower corals on the seabed. 海床上長著腦珊瑚、桌形珊瑚、鹿角珊瑚、團塊珊瑚和花椰菜珊瑚"
+  },
   "turtle": {
     "type": "checkbox",
     "value": true,
