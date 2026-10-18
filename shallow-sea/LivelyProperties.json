@@ -137,6 +137,12 @@
     "text": "Sea turtle 海龜",
     "help": "Swims by from deep water now and then, coming up to breathe. 偶爾從深水游過來，不時浮上水面換氣"
   },
+  "dolphins": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Dolphins 海豚",
+    "help": "Every few minutes a pod passes through the deep water, coming up to breathe. 每隔幾分鐘有一群海豚從深水區游過，會浮上水面換氣"
+  },
   "beachLife": {
     "type": "checkbox",
     "value": true,

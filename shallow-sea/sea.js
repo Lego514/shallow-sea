@@ -19,6 +19,7 @@ const MAX_DROPS = 16;   // ripple impulses per frame
 const MAX_FISH = 64;
 const MAX_FLOATS = 12;
 const MAX_PELLETS = 60;
+const MAX_DOLPHINS = 6;
 
 const canvas = document.getElementById('sea');
 const msgEl = document.getElementById('msg');
@@ -52,6 +53,7 @@ const S = {
   turtle: true,
   beachLife: true,
   feed: true,                  // hold still on the water to sprinkle fish food
+  dolphins: true,              // a pod passes through the deep water every few minutes
   tide: true,
   sound: false,
   volume: 0.48,
@@ -581,11 +583,12 @@ void main() {
   else if (sp < 9.5) { ext = vec2(0.72, 0.8); off = vec2(0.06, 0.0); }  // sea turtle
   else if (sp < 10.5) ext = vec2(0.62, 0.62);                            // hermit crab
   else if (sp < 11.5) { ext = vec2(0.66, 1.0); off = vec2(-0.08, 0.0); } // gull (only its shadow is drawn)
-  else ext = vec2(0.62, 0.62);                                           // a crumb of fish food
+  else if (sp < 12.5) ext = vec2(0.62, 0.62);                            // a crumb of fish food
+  else { ext = vec2(0.6, 0.3); off = vec2(-0.03, 0.0); }                // dolphin
   vec2 pos = i_a.xy;
   vec2 uv = clamp(vec2(pos.x / u_aspect, pos.y), 0.0, 1.0);
   float blur = 0.0;
-  if (u_shadow == 1 && sp > 10.5) {
+  if (u_shadow == 1 && sp > 10.5 && sp < 11.5) {
     blur = 0.006;                                   // a gull high overhead: a soft shadow, already placed
   } else if (u_shadow == 1) {
     float D = max(textureLod(u_floor, uv, 0.0).a, 0.0);
@@ -920,6 +923,54 @@ vec4 pellet(vec2 q, out float sha) {
   return vec4(c * a, a);
 }
 
+// bottlenose dolphin from above: a grey streamlined body, rounded melon and short beak, swept-back flippers,
+// the dorsal fin as a dark ridge, and horizontal flukes that shorten and lengthen as they beat up and down
+vec4 dolphin(vec2 q, out float sha) {
+  float ph = v_b.y, bend = v_b.z, aa = fwidth(q.x) + v_blur;
+  q.y -= bend * 0.4 * (q.x - 0.2) * (q.x - 0.2);
+  float ay = abs(q.y);
+  // body: a rounded head, widest a third of the way back, then a long taper into a slim tail stock
+  const float W = 0.085, XM = 0.12, XH = 0.44, XT = -0.47, WP = 0.02;
+  float uf = clamp((q.x - XM) / (XH - XM), 0.0, 1.0), ur = clamp((XM - q.x) / (XM - XT), 0.0, 1.0);
+  float w = q.x > XM ? W * pow(1.0 - pow(uf, 2.2), 0.6) : mix(W, WP, pow(ur, 1.6));
+  float body = smoothstep(aa, -aa, max(ay - w, max(q.x - XH, XT - q.x)));
+  // short beak in front of the melon
+  vec2 bq = vec2(q.x - clamp(q.x, 0.40, 0.505), q.y);
+  float beak = smoothstep(aa, -aa, length(bq) - 0.019);
+  // flukes: two lobes swept back from the tail; they look shorter as they beat up and down
+  float sp = ay / 0.15;
+  float le = XT + 0.015 - 0.10 * sp * sp;
+  float chord = (0.075 * sqrt(max(1.0 - sp * sp, 0.0)) + 0.004) * (0.6 + 0.4 * abs(cos(ph))) * smoothstep(0.0, 0.12, sp + 0.03);
+  float flukes = smoothstep(aa, -aa, max(max(q.x - le, le - chord - q.x), ay - 0.15));
+  // flippers, swept back from just behind the head
+  vec2 pq = vec2(q.x - 0.19, ay - 0.07);
+  vec2 fd = vec2(-0.55, 0.835);
+  float along = dot(pq, fd), across = dot(pq, vec2(-fd.y, fd.x));
+  float flip = smoothstep(aa, -aa, (length(vec2((along - 0.05) / 0.065, across / 0.02)) - 1.0) * 0.02);
+  float a = max(max(body, beak), max(flukes, flip));
+  // dark grey cape along the back, paler flanks; fins and beak a shade darker
+  vec3 back = v_c.rgb, flank = back * 1.45 + vec3(0.03, 0.04, 0.05);
+  float side = smoothstep(0.35, 1.0, ay / max(w, 0.015));
+  vec3 c = mix(back, flank, side * body);
+  c = mix(c, back * 0.75, max(max(flukes, flip), beak) * (1.0 - body));
+  float fin = smoothstep(0.012, 0.004, ay - 0.004 * smoothstep(0.1, -0.06, q.x)) * smoothstep(-0.09, -0.05, q.x) * smoothstep(0.12, 0.08, q.x);
+  c = mix(c, back * 0.5, fin);                                                                     // dorsal fin
+  c = mix(c, back * 0.6, smoothstep(0.004, 0.0, abs(q.x - 0.40)) * step(ay, 0.03) * body);        // crease where melon meets beak
+  c = mix(c, back * 0.45, smoothstep(0.011, 0.006, length(vec2(q.x - 0.29, q.y))));                // blowhole
+  c = mix(c, vec3(0.04), smoothstep(0.009, 0.005, length(vec2(q.x - 0.37, ay - 0.04))));          // eyes
+  // wet skin catching the light when it breaks the surface
+  float wet = smoothstep(0.12, 0.02, v_b.w), yw = q.y / max(w, 0.015);
+  c += vec3(0.32, 0.35, 0.38) * wet * exp(-pow((yw - 0.3) / 0.18, 2.0)) * body * smoothstep(-0.3, 0.1, q.x);
+  // drawn a second time on the surface layer while breathing: only the back that breaks the water, crisp and wet
+  if (v_c.w > 0.0) {
+    float r = length(vec2((q.x - 0.12) / 0.24, ay / (0.75 * max(w, 0.01)))), fr = fwidth(r);
+    a *= smoothstep(1.0 + fr, 1.0 - fr, r) * v_c.w;
+    c = mix(c, vec3(0.75, 0.84, 0.88), smoothstep(0.82, 1.0, r) * 0.3);                           // water sheeting off at the waterline
+  }
+  sha = a * 0.9;
+  return vec4(c * a, a);
+}
+
 // a gull gliding overhead: never seen itself, only its shadow sweeping over sand and water
 vec4 gull(vec2 q, out float sha) {
   float ph = v_b.y, aa = fwidth(q.x) + v_blur;
@@ -947,7 +998,8 @@ void main() {
   else if (sp < 9.5) c = turtle(v_q, sha);
   else if (sp < 10.5) c = hermitCrab(v_q, sha);
   else if (sp < 11.5) c = gull(v_q, sha);
-  else c = pellet(v_q, sha);
+  else if (sp < 12.5) c = pellet(v_q, sha);
+  else c = dolphin(v_q, sha);
   if (u_shadow == 1) o = vec4(sha, 0.0, 0.0, sha);
   else if (u_shadow == 2) o = vec4(0.0, sp > 6.5 && sp < 8.5 ? min(c.a * 1.8, 1.0) : 0.0, 0.0, 0.0);   // jellyfish glow
   else o = c;
@@ -1297,8 +1349,8 @@ function makeBatch(max) {
   return { vao, buf, data: new Float32Array(max * 12), count: 0 };
 }
 const deepBatch = makeBatch(4);
-const fishBatch = makeBatch(MAX_FISH + 32 + MAX_PELLETS);
-const floatBatch = makeBatch(MAX_FLOATS + 6 + MAX_PELLETS);
+const fishBatch = makeBatch(MAX_FISH + 32 + MAX_PELLETS + MAX_DOLPHINS);
+const floatBatch = makeBatch(MAX_FLOATS + 6 + MAX_PELLETS + MAX_DOLPHINS);
 const skyBatch = makeBatch(6);
 
 function drawTri() { gl.bindVertexArray(triVAO); gl.drawArrays(gl.TRIANGLES, 0, 3); }
@@ -1697,6 +1749,10 @@ function splash(x, y, power) {
     if (d < 0.3) { const k = 1 - d / 0.3; j.vx += dx / d * 0.06 * k; j.vy += dy / d * 0.06 * k; }
   }
   for (const c of crabs) if (Math.hypot(c.x - x, c.y - y) < 0.15) c.hideT = rand(3, 6);
+  for (const d of dolphins) {
+    const dx = d.x - x, dy = d.y - y, dd = Math.hypot(dx, dy) + 1e-4;
+    if (dd < 0.4) { d.fear = 1; d.vx += dx / dd * 0.12; d.vy += dy / dd * 0.12; }
+  }
   if (S.sound && audio.ctx && depthAt(x, y) > 0) plop();
   for (const f of floats) {
     const dx = f.x - x, dy = f.y - y, d = Math.hypot(dx, dy) + 1e-4;
@@ -1846,6 +1902,11 @@ function updateFish(dt) {
         calm = d < ring * 2.5;
       }
     }
+    // dolphins hunt fish: the school scatters when one comes close
+    for (const d of dolphins) {
+      const dx = f.x - d.x, dy = f.y - d.y, dd = Math.hypot(dx, dy) + 1e-4;
+      if (dd < 0.25) { const k = 1 - dd / 0.25; ax += dx / dd * 1.4 * k; ay += dy / dd * 1.4 * k; f.fear = Math.max(f.fear, 0.6 * k); }
+    }
     // food in the water: dart to the nearest crumb and snap it up
     let chase = false;
     if (f.chew > 0) f.chew -= dt;
@@ -1967,6 +2028,83 @@ function updateCrabs(dt) {
       addPrint(px, py, 0.0016, 0.45);
     }
   }
+}
+
+// ---------------------------------------------------------------- dolphins: a pod passes through the deep water now and then
+let dolphins = [];
+let podTimer = rand(40, 90), podAge = 0;
+function spawnPod() {
+  const [sx, sy] = offscreenSeaPoint(0.6, 0.45);
+  // head for the far side of the deep water, so the pod crosses the long way
+  let ex = aspect - sx, ey = 1 - sy, best = 0;
+  for (let i = 0; i < 24; i++) {
+    const [x, y] = offscreenSeaPoint(0.6, 0.6), dd = Math.hypot(x - sx, y - sy);
+    if (dd > best) { best = dd; ex = x; ey = y; }
+  }
+  const ang = Math.atan2(ey - sy, ex - sx), n = 3 + Math.floor(rand(0, 4));
+  dolphins = [];
+  for (let i = 0; i < n; i++) {
+    const calf = i > 1 && Math.random() < 0.3;
+    const ox = -0.12 * Math.ceil(i / 2) - rand(0, 0.05), oy = i === 0 ? 0 : (i % 2 ? 1 : -1) * (0.08 + 0.04 * Math.ceil(i / 2)) + rand(-0.02, 0.02);
+    const c = Math.cos(ang), s = Math.sin(ang), g = rand(-0.03, 0.03);
+    dolphins.push({ lead: i === 0, ox, oy, tx: ex, ty: ey, x: sx + c * ox - s * oy, y: sy + s * ox + c * oy, ang,
+                    vx: c * 0.11, vy: s * 0.11, angVel: 0, bend: 0, len: calf ? rand(0.15, 0.17) : rand(0.22, 0.27),
+                    phase: rand(0, TAU), beat: rand(0.9, 1.2), breath: rand(0, 1), breathRate: rand(1 / 9, 1 / 6),
+                    blown: false, depth: 0.2, fear: 0, col: [0.19 + g, 0.22 + g, 0.26 + g] });
+  }
+  podAge = 0;
+}
+function updateDolphins(dt) {
+  if (!S.dolphins) { dolphins = []; return; }
+  if (!dolphins.length) {
+    podTimer -= dt;
+    if (podTimer <= 0) { spawnPod(); podTimer = rand(120, 240); }
+    return;
+  }
+  podAge += dt;
+  const lead = dolphins[0];
+  for (const d of dolphins) {
+    let ax, ay;
+    const onScreen = d.x > 0 && d.x < aspect && d.y > 0 && d.y < 1;
+    if (d.lead) {
+      const dx = d.tx - d.x, dy = d.ty - d.y, dist = Math.hypot(dx, dy) + 1e-4, cruise = 0.11 * (1 + d.fear);
+      ax = (dx / dist * cruise - d.vx) * 0.6; ay = (dy / dist * cruise - d.vy) * 0.6;
+      if (onScreen && depthAt(d.x + Math.cos(d.ang) * 0.25, d.y + Math.sin(d.ang) * 0.25) < 0.55) {
+        const [gx, gy] = deeperDir(d.x, d.y);
+        ax += gx * 0.25; ay += gy * 0.25;
+      }
+    } else {
+      // keep station beside and behind the leader
+      const c = Math.cos(lead.ang), s = Math.sin(lead.ang);
+      const px = lead.x + c * d.ox - s * d.oy, py = lead.y + s * d.ox + c * d.oy;
+      ax = (px - d.x) * 1.5 + (lead.vx - d.vx) * 1.2; ay = (py - d.y) * 1.5 + (lead.vy - d.vy) * 1.2;
+    }
+    d.vx += ax * dt; d.vy += ay * dt;
+    const sp = Math.hypot(d.vx, d.vy);
+    if (sp > 0.45) { d.vx *= 0.45 / sp; d.vy *= 0.45 / sp; }
+    d.x += d.vx * dt; d.y += d.vy * dt;
+    steerHeading(d, dt, 1.6);
+    d.bend += (Math.max(-0.5, Math.min(0.5, d.angVel * 0.25)) - d.bend) * Math.min(1, dt * 6);
+    d.phase += dt * TAU * d.beat * (1 + d.fear);
+    d.fear = Math.max(0, d.fear - dt * 0.3);
+    // every 6–9 seconds each one rises to breathe: a quick arc up to the surface and back down
+    d.breath = (d.breath + dt * d.breathRate) % 1;
+    const rise = Math.pow(Math.max(0, Math.sin(d.breath * TAU)), 6);
+    d.depth = 0.2 - 0.19 * rise;
+    const hx = d.x + Math.cos(d.ang) * d.len * 0.45, hy = d.y + Math.sin(d.ang) * d.len * 0.45;
+    if (rise > 0.5 && onScreen && Math.random() < dt * 25) addDrop(hx, hy, hx, hy, 0.012, -0.08 * S.ripple);
+    if (rise > 0.9 && !d.blown) {
+      d.blown = true;
+      if (onScreen) {
+        addDrop(hx, hy, hx, hy, 0.022, -0.35 * S.ripple);
+        if (S.sound && audio.ctx && audio.ctx.state === 'running') hiss(audio.ctx.currentTime, 'bandpass', 1300, 0.8, 0.02, 0.35, 0.07);
+      }
+    }
+    if (rise < 0.2) d.blown = false;
+  }
+  // the pod is gone once the leader has reached the far side and the rest have followed it off screen
+  const off = d => d.x < -d.len || d.x > aspect + d.len || d.y < -d.len || d.y > 1 + d.len;
+  if ((Math.hypot(lead.tx - lead.x, lead.ty - lead.y) < 0.3 && dolphins.every(off)) || podAge > 90) dolphins = [];
 }
 
 let gullTimer = rand(6, 20);
@@ -2158,6 +2296,7 @@ function packInstances() {
   for (const j of jellies) put(j.x, j.y, j.ang, j.len, j.kind, j.phase, 0, j.depth, [1, 1, 1], j.extra);
   // food still floating belongs to the surface layer (no water in front of it); once it sinks, to the fish layer
   for (const p of pellets) if (p.depth > 0) put(p.x, p.y, p.ang, p.len, 12, 0, 0, p.depth, p.col, 0);
+  for (const d of dolphins) put(d.x, d.y, d.ang, d.len, 13, d.phase, d.bend, d.depth, d.col, 0);
   for (const f of fish) if (f.kind === 1) put(f.x, f.y, f.ang, f.len, 1, f.phase, f.bend, f.depth, f.col, f.extra);
   for (const f of fish) if (f.kind === 0) put(f.x, f.y, f.ang, f.len, 0, f.phase, f.bend, f.depth, f.col, f.extra);
   fishBatch.count = n;
@@ -2173,6 +2312,7 @@ function packInstances() {
   d = floatBatch.data;
   for (const c of crabs) put(c.x, c.y, c.ang, c.len, 10, c.phase, c.hide, 1, c.col, c.extra);
   for (const p of pellets) if (p.depth === 0) put(p.x, p.y, p.ang, p.len, 12, 0, 0, 0, p.col, 0);
+  for (const d of dolphins) if (d.depth < 0.06) put(d.x, d.y, d.ang, d.len, 13, d.phase, d.bend, 0, d.col, Math.min(1, (0.06 - d.depth) / 0.04));
   floatBatch.count = n;
   n = 0;
   d = skyBatch.data;
@@ -2505,6 +2645,7 @@ function step(dt) {
   updateCrabs(dt);
   updatePellets(dt);
   updateGulls(dt);
+  updateDolphins(dt);
   waveSounds();
   updateFloats(dt);
   updateRain(dt);
@@ -2573,6 +2714,7 @@ const PROPS = {
   turtle: v => { S.turtle = v === true || v === 'true'; syncRays(); },
   beachLife: v => { S.beachLife = v === true || v === 'true'; syncCrabs(); },
   feedFish: v => { S.feed = v === true || v === 'true'; },
+  dolphins: v => { S.dolphins = v === true || v === 'true'; if (!S.dolphins) dolphins = []; },
   sound: v => { S.sound = v === true || v === 'true'; if (S.sound) audioStart(); audioLevel(); },
   volume: v => { S.volume = v / 100 * 0.8; audioLevel(); },
 };
@@ -2612,6 +2754,8 @@ window.sea = { splash: (x, y) => splash(x * aspect, 1 - y, 1), regenerate, setti
   get floorBuilds() { return floorBuilds; },
   get paused() { return paused; },
   get pellets() { return pellets; },
+  get dolphins() { return dolphins; },
+  spawnDolphins: () => { spawnPod(); },
   resetAppetite: () => { for (const f of fish) { f.appetite = rand(3, 7); f.fullT = 0; f.chew = 0; } },
   stopStepping: () => { stepping = false; },
   // drive the real loop with a made-up timestamp; true if it drew (lets the frame-rate cap be tested in a hidden tab)
