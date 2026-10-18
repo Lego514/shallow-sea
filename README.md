@@ -40,7 +40,7 @@ Wallpaper Engine has no buttons in its settings, so **New seabed** and **Show se
 | Hold the cursor still | Curious little fish gather around it |
 | Go near a hermit crab | It pulls back into its shell, then carries on, leaving tiny footprints |
 | Click right beside the dolphins | Startled, one leaps clear of the water and crashes back in with a burst of whitewater |
-| At night | Touching the water lights up glowing plankton; jellyfish and breaking surf glow |
+| At night | Touching the water lights up glowing plankton; jellyfish and breaking surf glow. Now and then a nest of turtle hatchlings breaks open on the beach and they scramble down to the sea, leaving tiny tracks (they freeze if you sweep the cursor over them) |
 | Nothing at all | Waves arrive in sets and at an angle: the swell slows and steepens in the shallows (focusing a bright band of light on the sand), breaks into whitewater, runs up the beach and drains back in streaks of foam, leaving a foam line at the top; wet sand darkens and the churned water clouds for a moment |
 
 ## Settings
@@ -51,7 +51,7 @@ Wallpaper Engine has no buttons in its settings, so **New seabed** and **Show se
 - **New seabed** and **fixed seabed number**: every start makes a new seabed; to keep one you like, use its number.
 - **Tides**: the sea rises and falls with real time, about every 12.4 hours, so the beach widens and narrows.
 - Caustic light, wave size and speed, mouse ripples, rain, cloud shadows.
-- Small fish, big fish, rays, sea turtle, **dolphins**, jellyfish, hermit crabs & gulls, floating flowers & leaves, **feed the fish**.
+- Small fish, big fish, rays, sea turtle, **dolphins**, jellyfish, hermit crabs & gulls, **turtle hatchlings**, floating flowers & leaves, **feed the fish**.
 - **Wave sounds** (off by default) and **volume**: surf in step with the picture, and a plop when you tap the water.
 - **Save power when idle** (on by default): after 45 seconds without the mouse it drops to 30 FPS, and is back to full speed as soon as the mouse moves.
 - **Quality** and **limit to 30 FPS**: turn these down on a slow graphics card or on battery.
@@ -124,7 +124,7 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 | 游標停著不動幾秒 | 好奇的小魚會慢慢游過來繞著游標 |
 | 靠近寄居蟹 | 牠會縮進殼裡，過幾秒才探出頭繼續爬，沿路留下小腳印 |
 | 在海豚旁邊點一下 | 受驚的海豚會躍出水面，再「啪」一聲濺起白浪落回水裡 |
-| 晚上 | 碰到海水的地方會亮起藍色螢光浮游生物；水母和浪花也會發光 |
+| 晚上 | 碰到海水的地方會亮起藍色螢光浮游生物；水母和浪花也會發光。偶爾沙灘上會有一窩小海龜孵化，一路爬向大海、留下小小的爬痕（游標掃過時牠們會停住不動） |
 | 什麼都不做 | 浪一組一組、斜斜地打進來：湧浪在淺水裡變慢變陡，碎成白浪沖上沙灘，再拖著泡沫條紋退回去，最高處留下一道泡沫線 |
 
 ### 設定
@@ -135,7 +135,7 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 - **重新產生海床／固定海床編號**：每次啟動都是新的一片；喜歡現在這片就把編號填進去
 - **潮汐**：照真實時間大約每 12.4 小時漲退一次
 - 光紋強度、波浪大小／速度、滑鼠漣漪強度、雨、雲影
-- 小魚數量、大魚、魟魚、海龜、**海豚**、水母數量、寄居蟹與海鷗、漂浮的花與葉、**餵魚**
+- 小魚數量、大魚、魟魚、海龜、**海豚**、水母數量、寄居蟹與海鷗、**小海龜孵化**、漂浮的花與葉、**餵魚**
 - **海浪聲**（預設關閉）與**音量**
 - **閒置時省電**（預設開）：滑鼠 45 秒沒動就降到 30 FPS，一動馬上恢復
 - **畫質／鎖定 30 FPS**：顯示卡較弱或用電池時可以調低

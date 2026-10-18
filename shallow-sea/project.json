@@ -212,11 +212,17 @@
         "value": true,
         "order": 330
       },
+      "hatchlings": {
+        "type": "bool",
+        "text": "Turtle hatchlings 小海龜孵化",
+        "value": true,
+        "order": 340
+      },
       "feedfish": {
         "type": "bool",
         "text": "Feed the fish 餵魚",
         "value": true,
-        "order": 340
+        "order": 350
       },
       "jellycount": {
         "type": "slider",
@@ -226,7 +232,7 @@
         "value": 6,
         "fraction": false,
         "editable": true,
-        "order": 350
+        "order": 360
       },
       "floatcount": {
         "type": "slider",
@@ -236,13 +242,13 @@
         "value": 4,
         "fraction": false,
         "editable": true,
-        "order": 360
+        "order": 370
       },
       "sound": {
         "type": "bool",
         "text": "Wave sounds 海浪聲",
         "value": false,
-        "order": 380
+        "order": 390
       },
       "volume": {
         "type": "slider",
@@ -252,13 +258,13 @@
         "value": 60,
         "fraction": false,
         "editable": true,
-        "order": 390
+        "order": 400
       },
       "quality": {
         "type": "combo",
         "text": "Quality 畫質",
         "value": "0",
-        "order": 410,
+        "order": 420,
         "options": [
           {
             "label": "High (native resolution) 高（原生解析度）",
@@ -278,13 +284,13 @@
         "type": "bool",
         "text": "Save power when idle 閒置時省電",
         "value": true,
-        "order": 420
+        "order": 430
       },
       "fps30": {
         "type": "bool",
         "text": "Limit to 30 FPS 鎖定 30 FPS",
         "value": false,
-        "order": 430
+        "order": 440
       }
     }
   }

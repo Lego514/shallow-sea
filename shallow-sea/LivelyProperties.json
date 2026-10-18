@@ -149,6 +149,12 @@
     "text": "Hermit crabs & gulls 寄居蟹與海鷗",
     "help": "Crabs wander the sand leaving footprints and hide when you come close; gulls show only as shadows. 寄居蟹在沙灘上爬、留下腳印，靠近會縮進殼裡；海鷗只看得到影子"
   },
+  "hatchlings": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Turtle hatchlings 小海龜孵化",
+    "help": "On some nights a nest hatches on the beach and the little turtles scramble down to the sea. 夜晚偶爾有一窩小海龜在沙灘上孵化，一路爬向大海"
+  },
   "feedFish": {
     "type": "checkbox",
     "value": true,
