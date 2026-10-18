@@ -1,77 +1,116 @@
-# 淺海 Shallow Sea — 互動桌布
+# Shallow Sea
 
-![淺海](shallow-sea/preview.jpg)
+![Shallow Sea](shallow-sea/preview.jpg)
 
-從正上方看下去的一段熱帶海岸：沙灘、清澈的淺水，漸層到深藍色的海。用 WebGL2 即時運算，給 [Lively Wallpaper](https://github.com/rocksdanister/lively) 用的網頁桌布，也有可以直接在瀏覽器（含手機）玩的網頁版。
+An interactive tropical shore seen from above. Waves come in sets and wash up the beach, the water deepens from clear shallows through turquoise to deep blue, and fish, rays, a sea turtle and jellyfish swim through it. Everything is rendered live in WebGL2. It runs as a desktop wallpaper in [Lively Wallpaper](https://github.com/rocksdanister/lively) on Windows, or in any browser, phones included.
 
-**線上玩：<https://lego514.github.io/shallow-sea/>**（右下角齒輪可以調設定、切換中文／English）
+**Play it in your browser: <https://lego514.github.io/shallow-sea/>** — the gear in the bottom-right corner opens the settings (English or 中文).
 
-*An interactive tropical-shore wallpaper seen from above — waves washing up the beach, caustics, fish, rays, turtles and jellyfish, all rendered live in WebGL2. Runs as a [Lively Wallpaper](https://github.com/rocksdanister/lively) on Windows, or in any browser at the link above (settings panel in English or Chinese).*
+[中文說明](#中文說明)
 
-## 安裝成桌布
+## Install as a wallpaper
 
-1. 安裝 [Lively Wallpaper](https://github.com/rocksdanister/lively)。
-2. 到這個 repo 的 [Releases](https://github.com/Lego514/shallow-sea/releases/latest) 下載 `ShallowSea-Lively.zip`。
-3. 把 zip 拖進 Lively 視窗（或在 Lively 按「＋ 新增桌布」選這個 zip），再點它套用。
+1. Install [Lively Wallpaper](https://github.com/rocksdanister/lively).
+2. Download `ShallowSea-Lively.zip` from the [latest release](https://github.com/Lego514/shallow-sea/releases/latest).
+3. Drag the zip into the Lively window (or use **+ Add Wallpaper** and pick the zip), then click it to apply.
 
-在 Lively 的桌布上按「自訂」可以調整下面的設定。
+Open **Customise** on the wallpaper in Lively to change the settings below.
 
-> Lively 設定裡的「桌布輸入」要是「滑鼠」（預設就是），桌布才收得到滑鼠。
+> Lively's **Wallpaper input** setting must be **Mouse** (the default) for the wallpaper to react to your mouse.
 
-## 互動
+## What you can do
 
-| 動作 | 效果 |
+| Action | What happens |
 | --- | --- |
-| 滑鼠劃過水面 | 拖出一道漣漪，波紋會讓海床上的光紋跟著扭動 |
-| 按住拖曳 | 像把手伸進水裡，水波更大 |
-| 點一下 | 濺起水花、一圈圈擴散的光環；魚會四散，漂浮的花葉被推開 |
-| 在沙灘上按住拖曳 | 用手指在沙上寫字、畫圖；浪沖上來時會把它抹平 |
-| 什麼都不做 | 浪一組一組、斜斜地打進來：湧浪在淺水裡變慢變陡（底下的沙會被聚成一道亮光），碎成白浪沖上沙灘，再拖著泡沫條紋退回去，最高處留下一道泡沫線；沙被打濕變深色，水裡的沙被攪起來一下子變混 |
-| 游標停著不動幾秒 | 好奇的小魚會慢慢游過來繞著游標 |
-| 靠近寄居蟹 | 牠會縮進殼裡，過幾秒才探出頭繼續爬（沿路留下小腳印） |
-| 晚上（或選「夜晚」） | 碰到海水的地方會亮起藍色螢光浮游生物 |
+| Move the mouse over the water | Draws a trail of ripples; the light patterns on the seabed bend with them |
+| Click | A splash with rings of light; fish scatter and floating flowers drift away |
+| Press and drag | Like putting your hand in the water: bigger waves |
+| Press and drag on the sand | Write or draw with your finger; the next wave smooths it away |
+| Hold the cursor still | Curious little fish gather around it |
+| Go near a hermit crab | It pulls back into its shell, then carries on, leaving tiny footprints |
+| At night | Touching the water lights up glowing plankton; jellyfish and breaking surf glow |
+| Nothing at all | Waves arrive in sets and at an angle: the swell slows and steepens in the shallows (focusing a bright band of light on the sand), breaks into whitewater, runs up the beach and drains back in streaks of foam, leaving a foam line at the top; wet sand darkens and the churned water clouds for a moment |
 
-## 設定（Lively「自訂」面板）
+## Settings
 
-- **時段**：自動跟系統時鐘（清晨、正午、黃昏、夜晚之間平滑變化），或固定一個時段
-- **固定海床**：按「顯示目前海床編號」，右上角會出現數字，填進「固定海床編號」就會一直是這片；留空＝每次隨機
-- **潮汐**：照真實時間大約每 12.4 小時漲退一次，沙灘跟著變寬變窄
-- **海龜**、**寄居蟹與海鷗**：可以個別關掉
-- **海浪聲**（預設關閉）與**音量**：浪碎、沖上沙灘、退回的聲音跟畫面同步，點水面有「噗通」聲
-- **沙灘位置**：左上角（預設）、上方、右上角、左側、右側、下方，或沒有沙灘的整片淺海
-- **淺水顏色 / 深海顏色**：淺水是每一單位深度的透光顏色；深海是很深的地方最後變成的顏色
-- **重新產生海床**：每次啟動都是新的一片海床，這個按鈕可以立刻換一片
-- 光紋強度、波浪大小/速度、滑鼠漣漪強度、雨、雲影
-- 小魚數量、大魚、魟魚、水母數量、漂浮的花與葉
-- **畫質 / 鎖定 30 FPS**：筆電用電池時可以調低省電
+- **Time of day**: follows your clock (morning, noon, sunset and night blend into each other), or stays at one time.
+- **Beach**: top left (default), top, top right, left, right, bottom, or open shallows with no beach.
+- **Shallow / deep water colour**: how clear the shallows are, and the blue the deep water fades into.
+- **New seabed** and **fixed seabed number**: every start makes a new seabed; to keep one you like, use its number.
+- **Tides**: the sea rises and falls with real time, about every 12.4 hours, so the beach widens and narrows.
+- Caustic light, wave size and speed, mouse ripples, rain, cloud shadows.
+- Small fish, big fish, rays, sea turtle, jellyfish, hermit crabs & gulls, floating flowers & leaves.
+- **Wave sounds** (off by default) and **volume**: surf in step with the picture, and a plop when you tap the water.
+- **Quality** and **limit to 30 FPS**: turn these down on a slow graphics card or on battery.
 
-## 檔案
+## Files
 
 ```
 shallow-sea/
-  index.html             入口（Lively 用）
-  web.html               網頁版：同一個場景加上右下角的設定面板（中文／English）
-  sea.js                 全部的模擬與著色器
-  LivelyInfo.json        Lively 桌布資訊
-  LivelyProperties.json  Lively 自訂面板（網頁版的設定面板也是讀這份）
+  index.html             entry point used by Lively
+  web.html               the web version: the same scene plus a settings panel (English / 中文)
+  sea.js                 all of the simulation and shaders
+  LivelyInfo.json        wallpaper info for Lively
+  LivelyProperties.json  Lively's Customise panel (the web settings panel reads it too)
   thumbnail.jpg / preview.jpg
-.github/workflows/pages.yml   推上 main 時自動把網頁版發布到 GitHub Pages
+.github/workflows/pages.yml   publishes the web version to GitHub Pages on every push to main
 ```
 
-打包 Lively 用的 zip：把 `shallow-sea/` 裡的 `index.html`、`sea.js`、`LivelyInfo.json`、`LivelyProperties.json`、`thumbnail.jpg`、`preview.jpg` 壓成一個 zip（檔案放在 zip 最上層）。
+To package the wallpaper yourself, zip `index.html`, `sea.js`, `LivelyInfo.json`, `LivelyProperties.json`, `thumbnail.jpg` and `preview.jpg` from `shallow-sea/` with the files at the top level of the zip.
 
-## 在瀏覽器裡預覽
+## Run it locally
 
 ```bash
 python -m http.server 8765 --directory shallow-sea
 ```
 
-開 `http://localhost:8765/`（桌布版）或 `http://localhost:8765/web.html`（網頁版）。網址參數：`?hour=21`（指定時刻）、`?seed=123`（固定海床）、`?shore=3`（沙灘位置，0–6）、`?debug`（顯示 FPS）、`?view=1`（只看光紋）、`?view=2`（只看海床）、`?view=3`（水深圖）。
+Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.html` (web version). URL parameters: `?hour=21` (time of day), `?seed=123` (fixed seabed), `?shore=3` (beach position, 0–6), `?tide=0.05` (tide level), `?debug` (FPS counter), `?view=1` (caustics only), `?view=2` (seabed only), `?view=3` (depth map).
 
-## 原理簡述
+## How it works
 
-- **海床**：程序生成（沙灘、沙紋、海草、礁石、卵石、貝殼、海星），只在啟動或換海床時烘焙一次成貼圖，alpha 存水深（沙灘上是負的）。水深從岸邊一路變深，海水顏色依水深吸收光線（紅光最先被吃掉），深處變成散射的深藍。
-- **海浪**：海岸線烘焙成一張座標圖。每道浪有自己的大小（成組出現）、到達時間和斜角；每個像素同時追蹤最近四道浪：湧浪以 √水深 的速度前進、在依浪高決定的位置碎掉、沖上沙灘時減速、退回時加速。依這些算出水有沒有蓋過沙、泡沫多濃多老、沙有多濕；湧浪的曲率也算進光紋裡。
-- **水面**：10 道解析式風浪 ＋ GPU 高度場波動模擬（滑鼠、雨滴、魚和漂浮物激起的漣漪）。
-- **光紋**：對每個海床點反解是哪個水面點折射過來的陽光，亮度 = 1 / |折射映射的 Jacobian 行列式|，所以滑鼠激起的漣漪也會在海底投出對應的光環。
-- **生物**：小魚是 boids 魚群，大魚獨自巡游；藍點魟趴在淺水沙地上，斑點鷹魟和鬼蝠魟在水中拍翅膀游；月亮水母和金黃水母（海蕁麻）在較深的水裡一縮一放地漂。全部用 SDF 畫，影子沿折射後的太陽方向投在海床上。
+- **Seabed**: generated procedurally (beach, sand ripples, seagrass, rocks, pebbles, shells, starfish) and baked into a texture once per seabed; the alpha channel holds water depth, negative on the beach. Light is absorbed with depth, red first, so the water shades from clear to turquoise to the scattered blue of deep water.
+- **Waves on the beach**: the coastline is baked into a coordinate map. Each wave has its own size (they come in sets), arrival time and angle, and every pixel tracks the latest four: the swell travels at √depth, breaks where its height says it should, slows as it runs up the sand and speeds up as it drains. From that the shader works out whether the sand is covered, how thick and how old the foam is, and how wet the sand is. The swell's curvature also feeds the caustics.
+- **Water surface**: ten analytic wind waves plus a GPU height-field simulation for the ripples made by the mouse, rain, fish and floating things.
+- **Caustics**: for each point on the seabed the shader finds which surface point refracted the sunlight there; brightness is 1 / |det| of the refraction map's Jacobian, so your ripples cast matching rings of light on the sand.
+- **Sea life**: small fish school as boids, big fish roam alone, a blue-spotted stingray rests on the shallow sand, an eagle ray and a manta fly through the water, a green turtle surfaces to breathe, moon jellies and sea nettles pulse along in deeper water. All are drawn as signed-distance shapes and cast shadows along the refracted sun direction.
+
+---
+
+## 中文說明
+
+從正上方看下去的一段熱帶海岸：浪一組一組沖上沙灘，海水從清澈的淺水、土耳其藍漸層到深藍色；魚群、魟魚、海龜和水母在裡面游。全部用 WebGL2 即時運算，可以當 Windows 上 [Lively Wallpaper](https://github.com/rocksdanister/lively) 的桌布，也可以直接在瀏覽器（含手機）玩。
+
+**線上玩：<https://lego514.github.io/shallow-sea/>**（右下角齒輪可以調設定、切換中文／English）
+
+### 安裝成桌布
+
+1. 安裝 [Lively Wallpaper](https://github.com/rocksdanister/lively)。
+2. 到 [Releases](https://github.com/Lego514/shallow-sea/releases/latest) 下載 `ShallowSea-Lively.zip`。
+3. 把 zip 拖進 Lively 視窗（或按「＋ 新增桌布」選這個 zip），再點它套用。
+
+在 Lively 的桌布上按「自訂」可以調整設定。Lively 設定裡的「桌布輸入」要是「滑鼠」（預設就是），桌布才收得到滑鼠。
+
+### 互動
+
+| 動作 | 效果 |
+| --- | --- |
+| 滑鼠劃過水面 | 拖出一道漣漪，海床上的光紋跟著扭動 |
+| 點一下 | 濺起水花、一圈圈擴散的光環；魚會四散，漂浮的花葉被推開 |
+| 按住拖曳 | 像把手伸進水裡，水波更大 |
+| 在沙灘上按住拖曳 | 用手指在沙上寫字、畫圖；浪沖上來時會把它抹平 |
+| 游標停著不動幾秒 | 好奇的小魚會慢慢游過來繞著游標 |
+| 靠近寄居蟹 | 牠會縮進殼裡，過幾秒才探出頭繼續爬，沿路留下小腳印 |
+| 晚上 | 碰到海水的地方會亮起藍色螢光浮游生物；水母和浪花也會發光 |
+| 什麼都不做 | 浪一組一組、斜斜地打進來：湧浪在淺水裡變慢變陡，碎成白浪沖上沙灘，再拖著泡沫條紋退回去，最高處留下一道泡沫線 |
+
+### 設定
+
+- **時段**：自動跟系統時鐘，或固定一個時段
+- **沙灘位置**：左上角（預設）、上方、右上角、左側、右側、下方，或沒有沙灘的整片淺海
+- **淺水顏色／深海顏色**
+- **重新產生海床／固定海床編號**：每次啟動都是新的一片；喜歡現在這片就把編號填進去
+- **潮汐**：照真實時間大約每 12.4 小時漲退一次
+- 光紋強度、波浪大小／速度、滑鼠漣漪強度、雨、雲影
+- 小魚數量、大魚、魟魚、海龜、水母數量、寄居蟹與海鷗、漂浮的花與葉
+- **海浪聲**（預設關閉）與**音量**
+- **畫質／鎖定 30 FPS**：顯示卡較弱或用電池時可以調低

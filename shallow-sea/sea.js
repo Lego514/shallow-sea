@@ -1,4 +1,4 @@
-// 淺海 — interactive shallow-sea wallpaper (WebGL2, Lively Wallpaper compatible)
+// Shallow Sea (淺海) — interactive tropical-shore wallpaper (WebGL2, Lively Wallpaper compatible)
 //
 // Layers, bottom to top:
 //   seabed   procedural beach / sand / seagrass / rocks / pebbles / starfish, baked once into a texture
