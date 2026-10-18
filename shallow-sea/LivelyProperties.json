@@ -171,6 +171,12 @@
     "help": "顯示卡較弱或 4K 螢幕可調低",
     "items": ["高（原生解析度）", "中（75%）", "低（50%）"]
   },
+  "idleSave": {
+    "type": "checkbox",
+    "value": true,
+    "text": "閒置時省電",
+    "help": "滑鼠 45 秒沒動就降到 30 FPS，一動馬上恢復"
+  },
   "fps30": {
     "type": "checkbox",
     "value": false,

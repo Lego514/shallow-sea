@@ -58,6 +58,7 @@ const S = {
   clouds: 0.3,
   quality: 0,
   fps30: false,
+  idleSave: true,              // drop to 30 FPS when nobody has touched the wallpaper for a while
   glint: 0.16,
   exposure: 0.85,
   view: +(Q.get('view') || 0),
@@ -2356,12 +2357,26 @@ function showSeed() {
   seedTagTimer = setTimeout(() => { seedTag.style.opacity = '0'; }, 15000);
 }
 
+let stepping = false;               // test hook: the clock only moves when a frame is asked for (recording)
+const IDLE_AFTER = 45;              // seconds without the mouse before the wallpaper slows to 30 FPS
+
+// whether the loop should draw at this timestamp: full speed, or 30 FPS when locked or idle
+function wantsFrame(now) {
+  if (stepping) return false;
+  const idle = S.idleSave && time - mouse.lastMove > IDLE_AFTER && !mouse.down;
+  return !((S.fps30 || idle) && now - lastDraw < 1000 / 30 - 3);
+}
+
 function frame(now) {
   requestAnimationFrame(frame);
-  if (S.fps30 && now - lastDraw < 1000 / 30 - 3) return;
+  if (!wantsFrame(now)) { if (stepping) last = now; return; }
   lastDraw = now;
   const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000));
   last = now;
+  step(dt);
+}
+
+function step(dt) {
   time += dt;
 
   updateTide();
@@ -2417,6 +2432,7 @@ const PROPS = {
   clouds: v => { S.clouds = v / 100; },
   quality: v => { S.quality = v | 0; resize(true); },
   fps30: v => { S.fps30 = v === true || v === 'true'; },
+  idleSave: v => { S.idleSave = v === true || v === 'true'; },
   newSeabed: () => { if (performance.now() - bootAt > 3000) regenerate(); },
   showSeabed: () => { if (performance.now() - bootAt > 3000) showSeed(); },
   seabedNumber: v => {
@@ -2445,7 +2461,12 @@ window.livelyPropertyListener = (name, val) => {
 // hooks for testing from the console
 window.sea = { splash: (x, y) => splash(x * aspect, 1 - y, 1), regenerate, settings: S, get seed() { return seed; }, get rays() { return rays; }, get jellies() { return jellies; }, get crabs() { return crabs; }, get gulls() { return gulls; },
   spawnGulls: () => { gullTimer = 0; }, audio,
-  setSeedWord: w => { seedWord = w; }, get fish() { return fish; }, mouse,
+  setSeedWord: w => { seedWord = w; },
+  // render one frame of exactly dt seconds right now, without waiting for the browser (works in a hidden tab)
+  stepFrame: dt => { stepping = true; step(dt); return new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9)); },
+  stopStepping: () => { stepping = false; },
+  // drive the real loop with a made-up timestamp; true if it drew (lets the frame-rate cap be tested in a hidden tab)
+  driveFrame: now => { const t0 = time; frame(now); return time !== t0; }, get fish() { return fish; }, mouse,
   get time() { return time; }, set time(v) { time = v; },
   snapshot: () => new Promise(r => { snapshotCb = r; }) };
 

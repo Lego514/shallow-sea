@@ -1,6 +1,6 @@
 # Shallow Sea
 
-![Shallow Sea](shallow-sea/preview.jpg)
+![Shallow Sea](shallow-sea/preview.webp)
 
 An interactive tropical shore seen from above. Waves come in sets and wash up the beach, the water deepens from clear shallows through turquoise to deep blue, and fish, rays, a sea turtle and jellyfish swim through it. Everything is rendered live in WebGL2. It runs as a desktop wallpaper in [Lively Wallpaper](https://github.com/rocksdanister/lively) on Windows, or in any browser, phones included.
 
@@ -41,7 +41,10 @@ Open **Customise** on the wallpaper in Lively to change the settings below.
 - Caustic light, wave size and speed, mouse ripples, rain, cloud shadows.
 - Small fish, big fish, rays, sea turtle, jellyfish, hermit crabs & gulls, floating flowers & leaves.
 - **Wave sounds** (off by default) and **volume**: surf in step with the picture, and a plop when you tap the water.
+- **Save power when idle** (on by default): after 45 seconds without the mouse it drops to 30 FPS, and is back to full speed as soon as the mouse moves.
 - **Quality** and **limit to 30 FPS**: turn these down on a slow graphics card or on battery.
+
+Lively itself can pause the wallpaper entirely: in Lively's **Settings → Performance**, choose what happens while a fullscreen app runs, while another app has focus, and on battery.
 
 ## Files
 
@@ -52,11 +55,11 @@ shallow-sea/
   sea.js                 all of the simulation and shaders
   LivelyInfo.json        wallpaper info for Lively
   LivelyProperties.json  Lively's Customise panel (the web settings panel reads it too)
-  thumbnail.jpg / preview.jpg
+  thumbnail.jpg / preview.jpg / preview.gif / preview.webp   pictures for Lively and this README
 .github/workflows/pages.yml   publishes the web version to GitHub Pages on every push to main
 ```
 
-To package the wallpaper yourself, zip `index.html`, `sea.js`, `LivelyInfo.json`, `LivelyProperties.json`, `thumbnail.jpg` and `preview.jpg` from `shallow-sea/` with the files at the top level of the zip.
+To package the wallpaper yourself, zip `index.html`, `sea.js`, `LivelyInfo.json`, `LivelyProperties.json`, `thumbnail.jpg`, `preview.jpg` and `preview.gif` from `shallow-sea/` with the files at the top level of the zip.
 
 ## Run it locally
 
@@ -73,6 +76,10 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 - **Water surface**: ten analytic wind waves plus a GPU height-field simulation for the ripples made by the mouse, rain, fish and floating things.
 - **Caustics**: for each point on the seabed the shader finds which surface point refracted the sunlight there; brightness is 1 / |det| of the refraction map's Jacobian, so your ripples cast matching rings of light on the sand.
 - **Sea life**: small fish school as boids, big fish roam alone, a blue-spotted stingray rests on the shallow sand, an eagle ray and a manta fly through the water, a green turtle surfaces to breathe, moon jellies and sea nettles pulse along in deeper water. All are drawn as signed-distance shapes and cast shadows along the refracted sun direction.
+
+## License
+
+[MIT](LICENSE) — free to use, change and share; keep the copyright notice.
 
 ---
 
@@ -113,4 +120,11 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 - 光紋強度、波浪大小／速度、滑鼠漣漪強度、雨、雲影
 - 小魚數量、大魚、魟魚、海龜、水母數量、寄居蟹與海鷗、漂浮的花與葉
 - **海浪聲**（預設關閉）與**音量**
+- **閒置時省電**（預設開）：滑鼠 45 秒沒動就降到 30 FPS，一動馬上恢復
 - **畫質／鎖定 30 FPS**：顯示卡較弱或用電池時可以調低
+
+Lively 本身也能讓桌布完全暫停：在 Lively 的「設定 → 效能」可以設定有全螢幕程式、其他程式在前景、用電池時要不要暫停。
+
+### 授權
+
+[MIT](LICENSE)：可以自由使用、修改、分享，保留版權聲明即可。
