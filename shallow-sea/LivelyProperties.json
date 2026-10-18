@@ -141,7 +141,7 @@
     "type": "checkbox",
     "value": true,
     "text": "Dolphins 海豚",
-    "help": "Every few minutes a pod passes through the deep water, coming up to breathe. 每隔幾分鐘有一群海豚從深水區游過，會浮上水面換氣"
+    "help": "Every few minutes a pod passes through the deep water, coming up to breathe and now and then leaping clear of it. 每隔幾分鐘有一群海豚從深水區游過，會浮上水面換氣，偶爾躍出水面"
   },
   "beachLife": {
     "type": "checkbox",

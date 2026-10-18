@@ -20,6 +20,7 @@ const MAX_FISH = 64;
 const MAX_FLOATS = 12;
 const MAX_PELLETS = 60;
 const MAX_DOLPHINS = 6;
+const MAX_SPRAY = 8;
 
 const canvas = document.getElementById('sea');
 const msgEl = document.getElementById('msg');
@@ -584,7 +585,8 @@ void main() {
   else if (sp < 10.5) ext = vec2(0.62, 0.62);                            // hermit crab
   else if (sp < 11.5) { ext = vec2(0.66, 1.0); off = vec2(-0.08, 0.0); } // gull (only its shadow is drawn)
   else if (sp < 12.5) ext = vec2(0.62, 0.62);                            // a crumb of fish food
-  else { ext = vec2(0.6, 0.3); off = vec2(-0.03, 0.0); }                // dolphin
+  else if (sp < 13.5) { ext = vec2(0.6, 0.3); off = vec2(-0.03, 0.0); } // dolphin
+  else ext = vec2(1.0, 1.0);                                             // whitewater from a leap
   vec2 pos = i_a.xy;
   vec2 uv = clamp(vec2(pos.x / u_aspect, pos.y), 0.0, 1.0);
   float blur = 0.0;
@@ -926,7 +928,12 @@ vec4 pellet(vec2 q, out float sha) {
 // bottlenose dolphin from above: a grey streamlined body, rounded melon and short beak, swept-back flippers,
 // the dorsal fin as a dark ridge, and horizontal flukes that shorten and lengthen as they beat up and down
 vec4 dolphin(vec2 q, out float sha) {
-  float ph = v_b.y, bend = v_b.z, aa = fwidth(q.x) + v_blur;
+  float ph = v_b.y, bend = v_b.z, mode = v_c.w, aa = fwidth(q.x) + v_blur, cut = 0.0;
+  if (mode > 1.5) {
+    // leaping: pitched nose-up then nose-down, so from above the body looks shorter; y.phase holds the waterline
+    // (in body lengths along the body) and z.bend how much the length is foreshortened
+    cut = ph; q.x /= bend; aa /= bend; ph = 0.0; bend = 0.0;
+  }
   q.y -= bend * 0.4 * (q.x - 0.2) * (q.x - 0.2);
   float ay = abs(q.y);
   // body: a rounded head, widest a third of the way back, then a long taper into a slim tail stock
@@ -961,14 +968,55 @@ vec4 dolphin(vec2 q, out float sha) {
   // wet skin catching the light when it breaks the surface
   float wet = smoothstep(0.12, 0.02, v_b.w), yw = q.y / max(w, 0.015);
   c += vec3(0.32, 0.35, 0.38) * wet * exp(-pow((yw - 0.3) / 0.18, 2.0)) * body * smoothstep(-0.3, 0.1, q.x);
-  // drawn a second time on the surface layer while breathing: only the back that breaks the water, crisp and wet
-  if (v_c.w > 0.0) {
+  if (mode > 1.5) {
+    // 2 and 3: the part above the water while it leaves (head first) and comes back (head first again);
+    // 4 and 5: the part still under water, drawn in the fish layer
+    float keep = (mode < 2.5 || mode > 4.5) ? q.x - cut : cut - q.x;
+    a *= smoothstep(-0.008, 0.008, keep);
+    if (mode < 3.5) c = mix(c, vec3(0.80, 0.88, 0.92), smoothstep(0.07, 0.0, keep) * 0.6);         // water pouring off at the surface
+  } else if (mode > 0.0) {
+    // drawn a second time on the surface layer while breathing: only the back that breaks the water, crisp and wet
     float r = length(vec2((q.x - 0.12) / 0.24, ay / (0.75 * max(w, 0.01)))), fr = fwidth(r);
     a *= smoothstep(1.0 + fr, 1.0 - fr, r) * v_c.w;
     c = mix(c, vec3(0.75, 0.84, 0.88), smoothstep(0.82, 1.0, r) * 0.3);                           // water sheeting off at the waterline
   }
   sha = a * 0.9;
   return vec4(c * a, a);
+}
+
+// whitewater where a dolphin leaves the water or crashes back in: a churned patch that breaks into a web of foam,
+// a ring pushed outward, and droplets thrown clear in the first moments. y.phase = age 0..1, rgb = seed, strength
+vec4 spray(vec2 q, out float sha) {
+  float age = v_b.y, seed = v_c.r * 97.0, str = v_c.g;
+  float r = length(q);
+  // a lumpy patch of churned water that spreads as the splash falls back
+  vec2 dir = q / max(r, 1e-4);
+  float lump = gnoise(dir * 1.7 + seed) * 0.5 + gnoise(q * 4.0 + seed * 0.7) * 0.4;
+  float R = (0.3 + 0.35 * sqrt(age)) * (1.0 + 0.4 * lump);
+  float area = smoothstep(0.0, 0.16, R - r);
+  // bright, bubbly white at first, quickly tearing into blobs and lace as the bubbles rise and burst
+  float t1 = gnoise(q * 8.0 + seed * 1.3) * 0.55 + gnoise(q * 18.0 - seed) * 0.3;
+  float th = mix(-0.4, 0.5, sqrt(age));
+  float churn = smoothstep(th - 0.12, th + 0.12, t1);
+  float lace = smoothstep(0.07, 0.0, abs(t1 - th + 0.25)) * smoothstep(0.15, 0.5, age);
+  float foam = area * max(churn, lace * 0.7);
+  // a broken ring pushed out ahead of it
+  float Rr = R + 0.1 + 0.3 * age;
+  float ring = smoothstep(0.05, 0.0, abs(r - Rr)) * smoothstep(0.0, 0.5, gnoise(q * 6.0 - seed) + 0.1) * (1.0 - age) * 0.5;
+  // a few droplets raining back down around it in the first moments
+  vec2 cq = q * 10.0 + seed, cf = fract(cq) - 0.5, hr = hash22(floor(cq));
+  float front = R + age * (0.3 + 1.0 * hr.y);
+  float drop = smoothstep(0.15, 0.07, length(cf - (hr - 0.5) * 0.6)) * step(0.7, hr.x)
+             * smoothstep(0.2, 0.0, abs(r - front)) * (1.0 - smoothstep(0.05, 0.35, age)) * 0.8;
+  float fade = str * (1.0 - smoothstep(0.6, 1.0, age)) * smoothstep(1.0, 0.85, r);
+  float fa = clamp(max(max(foam, ring), drop) * fade, 0.0, 1.0) * 0.9;
+  vec3 fc = mix(vec3(0.78, 0.89, 0.94), vec3(0.97, 0.99, 1.0), smoothstep(th, th + 0.5, t1));
+  // bubbles still under the surface turn the water around it pale turquoise
+  float ha = smoothstep(R + 0.3, R - 0.05, r) * (1.0 - age) * 0.3 * fade;
+  vec4 o = vec4(fc * fa, fa);
+  o += vec4(vec3(0.55, 0.86, 0.88) * ha, ha) * (1.0 - o.a);
+  sha = fa * 0.35;
+  return o;
 }
 
 // a gull gliding overhead: never seen itself, only its shadow sweeping over sand and water
@@ -999,7 +1047,8 @@ void main() {
   else if (sp < 10.5) c = hermitCrab(v_q, sha);
   else if (sp < 11.5) c = gull(v_q, sha);
   else if (sp < 12.5) c = pellet(v_q, sha);
-  else c = dolphin(v_q, sha);
+  else if (sp < 13.5) c = dolphin(v_q, sha);
+  else c = spray(v_q, sha);
   if (u_shadow == 1) o = vec4(sha, 0.0, 0.0, sha);
   else if (u_shadow == 2) o = vec4(0.0, sp > 6.5 && sp < 8.5 ? min(c.a * 1.8, 1.0) : 0.0, 0.0, 0.0);   // jellyfish glow
   else o = c;
@@ -1350,7 +1399,7 @@ function makeBatch(max) {
 }
 const deepBatch = makeBatch(4);
 const fishBatch = makeBatch(MAX_FISH + 32 + MAX_PELLETS + MAX_DOLPHINS);
-const floatBatch = makeBatch(MAX_FLOATS + 6 + MAX_PELLETS + MAX_DOLPHINS);
+const floatBatch = makeBatch(MAX_FLOATS + 6 + MAX_PELLETS + MAX_DOLPHINS + MAX_SPRAY);
 const skyBatch = makeBatch(6);
 
 function drawTri() { gl.bindVertexArray(triVAO); gl.drawArrays(gl.TRIANGLES, 0, 3); }
@@ -1749,10 +1798,14 @@ function splash(x, y, power) {
     if (d < 0.3) { const k = 1 - d / 0.3; j.vx += dx / d * 0.06 * k; j.vy += dy / d * 0.06 * k; }
   }
   for (const c of crabs) if (Math.hypot(c.x - x, c.y - y) < 0.15) c.hideT = rand(3, 6);
+  let startled = null, sd = 0.3;
   for (const d of dolphins) {
+    if (d.leap) continue;
     const dx = d.x - x, dy = d.y - y, dd = Math.hypot(dx, dy) + 1e-4;
     if (dd < 0.4) { d.fear = 1; d.vx += dx / dd * 0.12; d.vy += dy / dd * 0.12; }
+    if (dd < sd && depthAt(d.x, d.y) > 0.3) { sd = dd; startled = d; }
   }
+  if (startled && time - lastLeap > 4) startLeap(startled);
   if (S.sound && audio.ctx && depthAt(x, y) > 0) plop();
   for (const f of floats) {
     const dx = f.x - x, dy = f.y - y, d = Math.hypot(dx, dy) + 1e-4;
@@ -2032,7 +2085,80 @@ function updateCrabs(dt) {
 
 // ---------------------------------------------------------------- dolphins: a pod passes through the deep water now and then
 let dolphins = [];
-let podTimer = rand(40, 90), podAge = 0;
+let podTimer = rand(40, 90), podAge = 0, podLeaps = 0, lastLeap = -99;
+let sprays = [];
+function addSpray(x, y, r, str, life) {
+  if (sprays.length < MAX_SPRAY && depthAt(x, y) > 0.02) sprays.push({ x, y, r, str, life, age: 0, seed: Math.random() });
+}
+function splashSound(big) {
+  if (!S.sound || !audio.ctx || audio.ctx.state !== 'running') return;
+  const ctx = audio.ctx, at = ctx.currentTime;
+  if (big) {
+    // the crash back in: a deep thump under a burst of water
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.setValueAtTime(160, at);
+    o.frequency.exponentialRampToValueAtTime(50, at + 0.25);
+    g.gain.setValueAtTime(0.3, at);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.3);
+    o.connect(g).connect(audio.out);
+    o.start(at); o.stop(at + 0.35);
+    hiss(at, 'lowpass', 1600, 0.5, 0.01, 0.8, 0.22);
+    hiss(at + 0.03, 'highpass', 2800, 0.7, 0.02, 0.6, 0.09);
+  } else {
+    hiss(at, 'bandpass', 900, 0.7, 0.02, 0.35, 0.08);
+  }
+}
+// launch a dolphin out of the water: a short arc a body length or so high, carried a couple of body lengths forward
+function startLeap(d) {
+  d.leap = { t: 0, dur: rand(1.0, 1.25), H: d.len * rand(1.15, 1.4), v: d.len * 1.6, entered: false, draw: null };
+  d.leap.v /= d.leap.dur;
+  lastLeap = time;
+  const hx = d.x + Math.cos(d.ang) * d.len * 0.45, hy = d.y + Math.sin(d.ang) * d.len * 0.45;
+  addDrop(hx, hy, hx, hy, 0.02, -0.5 * S.ripple);
+  addSpray(hx, hy, d.len * 0.3, 0.75, 0.9);
+  splashSound(false);
+}
+function updateLeap(d, dt) {
+  const lp = d.leap, L = d.len, c = Math.cos(d.ang), s = Math.sin(d.ang);
+  lp.t = Math.min(1, lp.t + dt / lp.dur);
+  d.vx = c * lp.v; d.vy = s * lp.v;
+  d.x += d.vx * dt; d.y += d.vy * dt;
+  d.angVel = 0; d.bend = 0; d.depth = 0;
+  // pitch goes from nose-up to nose-down; the body's centre rises and falls so the beak breaks the water first
+  // and the flukes leave it last
+  const u = lp.t, pitch = 0.85 - 1.8 * u, sp = Math.sin(pitch);
+  const zc = lp.H * 4 * u * (1 - u) - L * (0.375 + 0.072 * u);
+  let mode = 2, cut = -9;
+  if (sp > 0.03) cut = -zc / (L * sp);
+  else if (sp < -0.03) { mode = 3; cut = zc / (L * -sp); }
+  const fs = Math.max(Math.cos(pitch), 0.35), sc = 1 + 0.6 * Math.max(zc, 0);
+  lp.draw = { mode, cut, fs, sc };
+  if (mode === 3 && cut < 0.5 && !lp.entered) {
+    // head first back into the water: the big splash
+    lp.entered = true;
+    const k = cut * L * fs * sc, ex = d.x + c * k, ey = d.y + s * k;
+    addDrop(ex, ey, ex, ey, 0.035, -1.3 * S.ripple);
+    addSpray(ex, ey, L * 0.55, 1, 1.6);
+    splashSound(true);
+    for (const f of fish) {
+      const dx = f.x - ex, dy = f.y - ey, dd = Math.hypot(dx, dy) + 1e-4;
+      if (dd < 0.35) { const k2 = 1 - dd / 0.35; f.fear = Math.max(f.fear, 0.5 + 0.5 * k2); f.vx += dx / dd * 0.3 * k2; f.vy += dy / dd * 0.3 * k2; }
+    }
+  }
+  if (lp.t >= 1) {
+    // the flukes slap down as it disappears
+    const tx = d.x - c * L * 0.5, ty = d.y - s * L * 0.5;
+    addDrop(tx, ty, tx, ty, 0.02, -0.5 * S.ripple);
+    addSpray(tx, ty, L * 0.3, 0.7, 1.0);
+    d.leap = null;
+    d.vx = c * 0.2; d.vy = s * 0.2;
+    d.breath = 0.55; d.blown = true;
+  }
+}
+function updateSprays(dt) {
+  for (const p of sprays) p.age += dt / p.life;
+  sprays = sprays.filter(p => p.age < 1);
+}
 function spawnPod() {
   const [sx, sy] = offscreenSeaPoint(0.6, 0.45);
   // head for the far side of the deep water, so the pod crosses the long way
@@ -2043,6 +2169,8 @@ function spawnPod() {
   }
   const ang = Math.atan2(ey - sy, ex - sx), n = 3 + Math.floor(rand(0, 4));
   dolphins = [];
+  const lr = Math.random();
+  podLeaps = lr < 0.3 ? 0 : lr < 0.75 ? 1 : 2;      // most pods put on a show at least once
   for (let i = 0; i < n; i++) {
     const calf = i > 1 && Math.random() < 0.3;
     const ox = -0.12 * Math.ceil(i / 2) - rand(0, 0.05), oy = i === 0 ? 0 : (i % 2 ? 1 : -1) * (0.08 + 0.04 * Math.ceil(i / 2)) + rand(-0.02, 0.02);
@@ -2050,11 +2178,12 @@ function spawnPod() {
     dolphins.push({ lead: i === 0, ox, oy, tx: ex, ty: ey, x: sx + c * ox - s * oy, y: sy + s * ox + c * oy, ang,
                     vx: c * 0.11, vy: s * 0.11, angVel: 0, bend: 0, len: calf ? rand(0.15, 0.17) : rand(0.22, 0.27),
                     phase: rand(0, TAU), beat: rand(0.9, 1.2), breath: rand(0, 1), breathRate: rand(1 / 9, 1 / 6),
-                    blown: false, depth: 0.2, fear: 0, col: [0.19 + g, 0.22 + g, 0.26 + g] });
+                    blown: false, depth: 0.2, fear: 0, leap: null, col: [0.19 + g, 0.22 + g, 0.26 + g] });
   }
   podAge = 0;
 }
 function updateDolphins(dt) {
+  updateSprays(dt);
   if (!S.dolphins) { dolphins = []; return; }
   if (!dolphins.length) {
     podTimer -= dt;
@@ -2064,6 +2193,7 @@ function updateDolphins(dt) {
   podAge += dt;
   const lead = dolphins[0];
   for (const d of dolphins) {
+    if (d.leap) { updateLeap(d, dt); continue; }
     let ax, ay;
     const onScreen = d.x > 0 && d.x < aspect && d.y > 0 && d.y < 1;
     if (d.lead) {
@@ -2080,6 +2210,11 @@ function updateDolphins(dt) {
       ax = (px - d.x) * 1.5 + (lead.vx - d.vx) * 1.2; ay = (py - d.y) * 1.5 + (lead.vy - d.vy) * 1.2;
     }
     d.vx += ax * dt; d.vy += ay * dt;
+    if (!d.lead) {
+      // one that ended up ahead (after a leap) eases off and lets the pod catch up rather than turning back
+      const c = Math.cos(lead.ang), s = Math.sin(lead.ang), along = d.vx * c + d.vy * s;
+      if (along < 0.05) { d.vx += (0.05 - along) * c; d.vy += (0.05 - along) * s; }
+    }
     const sp = Math.hypot(d.vx, d.vy);
     if (sp > 0.45) { d.vx *= 0.45 / sp; d.vy *= 0.45 / sp; }
     d.x += d.vx * dt; d.y += d.vy * dt;
@@ -2095,6 +2230,13 @@ function updateDolphins(dt) {
     if (rise > 0.5 && onScreen && Math.random() < dt * 25) addDrop(hx, hy, hx, hy, 0.012, -0.08 * S.ripple);
     if (rise > 0.9 && !d.blown) {
       d.blown = true;
+      // now and then, instead of a breath, one leaps clear of the water
+      const m = 0.15, wellIn = d.x > m && d.x < aspect - m && d.y > m && d.y < 1 - m;
+      if (!d.lead && podLeaps > 0 && wellIn && time - lastLeap > 4 && depthAt(d.x, d.y) > 0.4 && Math.random() < 0.45) {
+        podLeaps--;
+        startLeap(d);
+        continue;
+      }
       if (onScreen) {
         addDrop(hx, hy, hx, hy, 0.022, -0.35 * S.ripple);
         if (S.sound && audio.ctx && audio.ctx.state === 'running') hiss(audio.ctx.currentTime, 'bandpass', 1300, 0.8, 0.02, 0.35, 0.07);
@@ -2296,7 +2438,11 @@ function packInstances() {
   for (const j of jellies) put(j.x, j.y, j.ang, j.len, j.kind, j.phase, 0, j.depth, [1, 1, 1], j.extra);
   // food still floating belongs to the surface layer (no water in front of it); once it sinks, to the fish layer
   for (const p of pellets) if (p.depth > 0) put(p.x, p.y, p.ang, p.len, 12, 0, 0, p.depth, p.col, 0);
-  for (const d of dolphins) put(d.x, d.y, d.ang, d.len, 13, d.phase, d.bend, d.depth, d.col, 0);
+  for (const d of dolphins) {
+    const l = d.leap && d.leap.draw;
+    if (l) put(d.x, d.y, d.ang, d.len * l.sc, 13, l.cut, l.fs, 0.05, d.col, l.mode + 2);   // what is still under water
+    else put(d.x, d.y, d.ang, d.len, 13, d.phase, d.bend, d.depth, d.col, 0);
+  }
   for (const f of fish) if (f.kind === 1) put(f.x, f.y, f.ang, f.len, 1, f.phase, f.bend, f.depth, f.col, f.extra);
   for (const f of fish) if (f.kind === 0) put(f.x, f.y, f.ang, f.len, 0, f.phase, f.bend, f.depth, f.col, f.extra);
   fishBatch.count = n;
@@ -2312,7 +2458,12 @@ function packInstances() {
   d = floatBatch.data;
   for (const c of crabs) put(c.x, c.y, c.ang, c.len, 10, c.phase, c.hide, 1, c.col, c.extra);
   for (const p of pellets) if (p.depth === 0) put(p.x, p.y, p.ang, p.len, 12, 0, 0, 0, p.col, 0);
-  for (const d of dolphins) if (d.depth < 0.06) put(d.x, d.y, d.ang, d.len, 13, d.phase, d.bend, 0, d.col, Math.min(1, (0.06 - d.depth) / 0.04));
+  for (const p of sprays) put(p.x, p.y, p.seed * TAU, p.r, 14, p.age, 0, 0, [p.seed, p.str, 0], 0);
+  for (const d of dolphins) {
+    const l = d.leap && d.leap.draw;
+    if (l) put(d.x, d.y, d.ang, d.len * l.sc, 13, l.cut, l.fs, 0, d.col, l.mode);
+    else if (d.depth < 0.06) put(d.x, d.y, d.ang, d.len, 13, d.phase, d.bend, 0, d.col, Math.min(1, (0.06 - d.depth) / 0.04));
+  }
   floatBatch.count = n;
   n = 0;
   d = skyBatch.data;
@@ -2756,6 +2907,8 @@ window.sea = { splash: (x, y) => splash(x * aspect, 1 - y, 1), regenerate, setti
   get pellets() { return pellets; },
   get dolphins() { return dolphins; },
   spawnDolphins: () => { spawnPod(); },
+  leapDolphin: i => { const d = dolphins[i ?? 1] || dolphins[0]; if (d && !d.leap) startLeap(d); return !!d; },
+  get sprays() { return sprays; },
   resetAppetite: () => { for (const f of fish) { f.appetite = rand(3, 7); f.fullT = 0; f.chew = 0; } },
   stopStepping: () => { stepping = false; },
   // drive the real loop with a made-up timestamp; true if it drew (lets the frame-rate cap be tested in a hidden tab)

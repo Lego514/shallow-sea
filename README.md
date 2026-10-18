@@ -39,6 +39,7 @@ Wallpaper Engine has no buttons in its settings, so **New seabed** and **Show se
 | Hold the mouse button still on the water | Sprinkles fish food: it floats, then slowly sinks, and the fish rush over to eat it (a stingray cleans up what reaches the bottom) |
 | Hold the cursor still | Curious little fish gather around it |
 | Go near a hermit crab | It pulls back into its shell, then carries on, leaving tiny footprints |
+| Click right beside the dolphins | Startled, one leaps clear of the water and crashes back in with a burst of whitewater |
 | At night | Touching the water lights up glowing plankton; jellyfish and breaking surf glow |
 | Nothing at all | Waves arrive in sets and at an angle: the swell slows and steepens in the shallows (focusing a bright band of light on the sand), breaks into whitewater, runs up the beach and drains back in streaks of foam, leaving a foam line at the top; wet sand darkens and the churned water clouds for a moment |
 
@@ -87,7 +88,7 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 - **Waves on the beach**: the coastline is baked into a coordinate map. Each wave has its own size (they come in sets), arrival time and angle, and every pixel tracks the latest four: the swell travels at √depth, breaks where its height says it should, slows as it runs up the sand and speeds up as it drains. From that the shader works out whether the sand is covered, how thick and how old the foam is, and how wet the sand is. The swell's curvature also feeds the caustics.
 - **Water surface**: ten analytic wind waves plus a GPU height-field simulation for the ripples made by the mouse, rain, fish and floating things.
 - **Caustics**: for each point on the seabed the shader finds which surface point refracted the sunlight there; brightness is 1 / |det| of the refraction map's Jacobian, so your ripples cast matching rings of light on the sand.
-- **Sea life**: small fish school as boids, big fish roam alone, a blue-spotted stingray rests on the shallow sand, an eagle ray and a manta fly through the water, a green turtle surfaces to breathe, every few minutes a pod of bottlenose dolphins crosses the deep water in formation (each one rising to breathe in turn, scattering the fish), moon jellies and sea nettles pulse along in deeper water. All are drawn as signed-distance shapes and cast shadows along the refracted sun direction.
+- **Sea life**: small fish school as boids, big fish roam alone, a blue-spotted stingray rests on the shallow sand, an eagle ray and a manta fly through the water, a green turtle surfaces to breathe, every few minutes a pod of bottlenose dolphins crosses the deep water in formation (each one rising to breathe in turn, now and then one leaping clear of the water and crashing back in, scattering the fish), moon jellies and sea nettles pulse along in deeper water. All are drawn as signed-distance shapes and cast shadows along the refracted sun direction.
 
 ## License
 
@@ -97,7 +98,7 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 
 ## 中文說明
 
-從正上方看下去的一段熱帶海岸：浪一組一組沖上沙灘，海水從清澈的淺水、土耳其藍漸層到深藍色；魚群、魟魚、海龜和水母在裡面游，偶爾還有一群海豚經過。全部用 WebGL2 即時運算，可以當 Windows 上 [Lively Wallpaper](https://github.com/rocksdanister/lively) 的桌布，也可以直接在瀏覽器（含手機）玩。
+從正上方看下去的一段熱帶海岸：浪一組一組沖上沙灘，海水從清澈的淺水、土耳其藍漸層到深藍色；魚群、魟魚、海龜和水母在裡面游，偶爾還有一群海豚經過，有時會躍出水面。全部用 WebGL2 即時運算，可以當 Windows 上 [Lively Wallpaper](https://github.com/rocksdanister/lively) 的桌布，也可以直接在瀏覽器（含手機）玩。
 
 **線上玩：<https://lego514.github.io/shallow-sea/>**（右下角齒輪可以調設定、切換中文／English）
 
@@ -122,6 +123,7 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 | 在水面上按住滑鼠不動 | 撒飼料：先浮在水面，再慢慢沉下去，魚會衝過來搶食（沉到底的會被藍點魟吃掉） |
 | 游標停著不動幾秒 | 好奇的小魚會慢慢游過來繞著游標 |
 | 靠近寄居蟹 | 牠會縮進殼裡，過幾秒才探出頭繼續爬，沿路留下小腳印 |
+| 在海豚旁邊點一下 | 受驚的海豚會躍出水面，再「啪」一聲濺起白浪落回水裡 |
 | 晚上 | 碰到海水的地方會亮起藍色螢光浮游生物；水母和浪花也會發光 |
 | 什麼都不做 | 浪一組一組、斜斜地打進來：湧浪在淺水裡變慢變陡，碎成白浪沖上沙灘，再拖著泡沫條紋退回去，最高處留下一道泡沫線 |
 
