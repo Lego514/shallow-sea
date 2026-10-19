@@ -1506,7 +1506,7 @@ uniform float u_waveAmp;
 uniform vec2 u_sunShift;
 uniform float u_pathK;
 uniform vec3 u_sunDir, u_sunCol, u_ambCol, u_skyCol, u_deepCol, u_sigma, u_bioCol, u_glintH;
-uniform float u_caustic, u_glint, u_bio, u_cloud, u_exposure, u_refl;
+uniform float u_caustic, u_glint, u_bio, u_cloud, u_exposure, u_refl, u_warm;
 uniform int u_view;
 uniform vec2 u_cloudOff;
 uniform float u_tide, u_moon;
@@ -1547,14 +1547,30 @@ float lace(vec2 q) {
   return r * r;
 }
 
-// slopes of the tiny capillary ripples that ride on the waves (they make the glints twinkle)
-vec2 capillary(vec2 p) {
-  vec2 q = p * 260.0;
-  vec2 t1 = vec2(1.9, 0.7) * u_time, t2 = vec2(-1.2, 1.6) * u_time;
-  float c0 = gnoise(q + t1) + gnoise(q * 1.7 - t2);
-  float cx = gnoise(q + vec2(0.3, 0.0) + t1) + gnoise((q + vec2(0.3, 0.0)) * 1.7 - t2);
-  float cy = gnoise(q + vec2(0.0, 0.3) + t1) + gnoise((q + vec2(0.0, 0.3)) * 1.7 - t2);
-  return vec2(cx - c0, cy - c0) / 0.3 * 0.010;
+// sparkles: light caught by the tiny facets of the capillary ripples riding on the waves. Every few pixels of
+// water hold one facet, which takes a new tilt every half second or so; if that tilt, on top of the slope nxy of
+// the wave it rides, mirrors the light toward us (the slope target), it flashes up and fades as a sharp point,
+// with a small cross of glare when it is bright
+float glitter(vec2 nxy, vec2 target, float spread, float seed) {
+  const float CELL = 7.0;
+  vec2 fc = gl_FragCoord.xy / CELL, ci = floor(fc - 0.5);   // the four nearest cells: a facet stays inside its own
+  float sum = 0.0;
+  for (int j = 0; j <= 1; j++) for (int i = 0; i <= 1; i++) {
+    vec2 c = ci + vec2(float(i), float(j));
+    vec2 h1 = hash22(c + seed);
+    float ph = u_time / (0.35 + 0.4 * h1.x) + h1.y, ep = floor(ph);
+    vec2 h2 = hash22(c + vec2(ep * 13.0, seed)), h3 = hash22(c - vec2(seed, ep * 7.0));
+    vec2 sl = nxy + (h2 + h3 - 1.0) * spread - target;
+    float m = exp(-dot(sl, sl) * 800.0);
+    if (m < 0.02) continue;
+    float k = fract(h2.x * 7.0 + h3.y);                    // most facets are tiny, a few catch a lot of light
+    float b = m * pow(sin(3.14159265 * fract(ph)), 2.0) * (0.15 + 0.85 * k * k * k);
+    vec2 d = (fc - c - 0.2 - 0.6 * h3) * CELL;            // in pixels from the facet
+    float core = exp(-dot(d, d) / (0.45 + 1.4 * b));
+    float glare = exp(-abs(d.x) * 1.0 - d.y * d.y * 3.0) + exp(-abs(d.y) * 1.0 - d.x * d.x * 3.0);
+    sum += b * (core + 0.45 * glare * smoothstep(0.4, 1.0, b));
+  }
+  return sum;
 }
 
 void main() {
@@ -1670,11 +1686,9 @@ void main() {
   float fres = 0.02 + 0.98 * pow(1.0 - n.z, 5.0);
   col = mix(col, u_skyCol * cl, clamp(fres * u_refl, 0.0, 1.0) * cover);
   col += u_skyCol * cl * 0.05 * wet * (1.0 - cover);           // sheen on wet sand
-  if (u_glint > 0.001 && dot(n, u_glintH) > 0.9965) {
-    vec3 n2 = normalize(vec3(-(g + capillary(p)), 1.0));
-    float gl = pow(max(dot(n2, u_glintH), 0.0), 5000.0);
-    col += u_sunCol * gl * u_glint * 3.5 * cl * cover;
-  }
+  // the slope that mirrors the sun to the eye changes a little across the view, so the sparkles gather toward the sun
+  vec2 tgt = u_glintH.xy / u_glintH.z - (p - vec2(0.5 * u_aspect, 0.5)) * 0.08, gd = -g - tgt;
+  if (u_glint > 0.001 && dot(gd, gd) < 0.035) col += u_sunCol * glitter(-g, tgt, 0.08, 0.0) * u_glint * 30.0 * cl * cover;
   // night: a path of moonlight glittering on the ripples out over the deep water. Seen from a little way up, each
   // point of the water mirrors the moon only where its slope is just right; that slope changes slowly along the
   // path and quickly across it, so the glints gather into a long, narrow, twinkling band. Sparkles only, no haze
@@ -1683,10 +1697,10 @@ void main() {
     float al = dot(dm, u_moonDir), ac = dot(dm, side);
     vec2 tilt = u_moonDir * al * 0.05 + side * ac * 0.8;
     float env = exp(-ac * ac * 28.0);                               // thickest down the middle of the path
-    if (dot(tilt, tilt) < 0.03 && env > 0.02) {
-      vec2 sl = -(g + capillary(p)) - tilt;
-      float m = exp(-dot(sl, sl) * 14000.0);                      // sharp: pinpoints on the ripples, not patches
-      col += vec3(0.8, 0.86, 1.0) * m * env * u_moon * 2.8 * cover * smoothstep(0.08, 0.5, D0);
+    vec2 md = -g - tilt;
+    if (dot(tilt, tilt) < 0.03 && env > 0.02 && dot(md, md) < 0.015) {
+      float m = glitter(-g, tilt, 0.04, 91.0);
+      col += vec3(0.8, 0.86, 1.0) * m * env * u_moon * 6.0 * cover * smoothstep(0.08, 0.5, D0);
     }
   }
 
@@ -1721,7 +1735,8 @@ void main() {
   vec2 vq = (uv - 0.5) * vec2(1.0, 0.85);
   col *= 1.0 - 0.22 * pow(clamp(length(vq) * 1.35, 0.0, 1.0), 2.5);
 
-  col *= u_exposure;
+  // golden hour: the lit, bright things turn golden while the deep water stays blue
+  col *= u_exposure * mix(vec3(1.0), vec3(1.14, 0.98, 0.82), u_warm * smoothstep(0.02, 0.35, dot(col, vec3(0.3, 0.5, 0.2))));
   col = (col * (2.51 * col + 0.03)) / (col * (2.43 * col + 0.59) + 0.14);
   col = pow(clamp(col, 0.0, 1.0), vec3(1.0 / 2.2));
   col += (hash21(gl_FragCoord.xy + fract(u_time * 7.3) * 640.0) - 0.5) / 255.0;
@@ -2926,17 +2941,17 @@ function updateRain(dt) {
 }
 
 // ---------------------------------------------------------------- light
-//      hour  elev  az   sun colour            ambient                 sky                 plankton reflect glint
-const NIGHT = [55, 200, [0.055, 0.075, 0.13], [0.008, 0.014, 0.028], [0.02, 0.035, 0.07], 1.0, 1.4, 0.7];
+//      hour  elev  az   sun colour            ambient                 sky                 plankton reflect glint warm
+const NIGHT = [55, 200, [0.055, 0.075, 0.13], [0.008, 0.014, 0.028], [0.02, 0.035, 0.07], 1.0, 1.4, 0.7, 0.0];
 const KEYS = [
   [0.0, ...NIGHT],
   [4.8, ...NIGHT],
-  [6.0,  6,  95,  [1.00, 0.62, 0.40], [0.15, 0.14, 0.20],    [0.85, 0.62, 0.55], 0.25, 3.5, 1.6],
-  [7.5,  24, 108, [1.05, 0.92, 0.78], [0.20, 0.25, 0.31],    [0.72, 0.82, 0.92], 0.0,  1.5, 1.1],
-  [12.5, 68, 180, [1.15, 1.12, 1.06], [0.24, 0.31, 0.35],    [0.76, 0.88, 1.00], 0.0,  1.2, 1.0],
-  [16.0, 40, 245, [1.12, 1.00, 0.84], [0.23, 0.28, 0.32],    [0.74, 0.84, 0.95], 0.0,  1.4, 1.1],
-  [17.8, 9,  272, [1.15, 0.68, 0.36], [0.22, 0.18, 0.22],    [1.00, 0.66, 0.42], 0.1,  4.0, 1.9],
-  [18.9, 3,  282, [0.30, 0.24, 0.36], [0.05, 0.05, 0.10],    [0.30, 0.22, 0.32], 0.6,  2.5, 0.8],
+  [6.0,  6,  95,  [1.00, 0.62, 0.40], [0.15, 0.14, 0.20],    [0.85, 0.62, 0.55], 0.25, 3.5, 1.6, 1.0],
+  [7.5,  24, 108, [1.05, 0.92, 0.78], [0.20, 0.25, 0.31],    [0.72, 0.82, 0.92], 0.0,  1.5, 1.1, 0.4],
+  [12.5, 68, 180, [1.15, 1.12, 1.06], [0.24, 0.31, 0.35],    [0.76, 0.88, 1.00], 0.0,  1.2, 1.0, 0.0],
+  [16.0, 40, 245, [1.12, 1.00, 0.84], [0.23, 0.28, 0.32],    [0.74, 0.84, 0.95], 0.0,  1.4, 1.1, 0.15],
+  [17.8, 9,  272, [1.15, 0.68, 0.36], [0.22, 0.18, 0.22],    [1.00, 0.66, 0.42], 0.1,  4.0, 1.9, 1.0],
+  [18.9, 3,  282, [0.30, 0.24, 0.36], [0.05, 0.05, 0.10],    [0.30, 0.22, 0.32], 0.6,  2.5, 0.8, 0.5],
   [20.0, ...NIGHT],
   [24.0, ...NIGHT],
 ];
@@ -2984,6 +2999,7 @@ function lighting() {
     bio: lerp(a[6], b[6], t),
     refl: lerp(a[7], b[7], t),
     glint: lerp(a[8], b[8], t),
+    warm: lerp(a[9], b[9], t),
     glintH: hv,
     sunDir: sun,
   };
@@ -3206,7 +3222,9 @@ function composite(L, dt) {
 
   const sig = S.water.map(c => -Math.log(Math.max(0.02, Math.min(0.995, c))));
   gl.uniform3fv(u.u_sigma, sig);
-  gl.uniform3f(u.u_deepCol, ...[0, 1, 2].map(i => Math.pow(S.deep[i], 2.2) * (L.sunCol[i] * 0.55 + L.amb[i] * 1.6) / 1.1));
+  // the deep water takes on the colour of the light, except at golden hour, when it stays a deep blue
+  const lf = [0, 1, 2].map(i => L.sunCol[i] * 0.55 + L.amb[i] * 1.6), lm = (lf[0] + lf[1] + lf[2]) / 3;
+  gl.uniform3f(u.u_deepCol, ...[0, 1, 2].map(i => Math.pow(S.deep[i], 2.2) * lerp(lf[i], lm, 0.6 * L.warm) / 1.1));
   gl.uniform3fv(u.u_sunDir, L.sunDir);
   gl.uniform2f(u.u_sunShift, L.sunShift[0], L.sunShift[1]);
   gl.uniform1f(u.u_pathK, L.pathK);
@@ -3218,6 +3236,7 @@ function composite(L, dt) {
   gl.uniform1f(u.u_caustic, S.caustic);
   gl.uniform1f(u.u_glint, S.glint * L.glint);
   gl.uniform1f(u.u_refl, L.refl);
+  gl.uniform1f(u.u_warm, L.warm);
   gl.uniform1f(u.u_bio, L.bio);
   gl.uniform1f(u.u_cloud, S.clouds);
   cloudX += world.cloudVel[0] * dt; cloudY += world.cloudVel[1] * dt;
