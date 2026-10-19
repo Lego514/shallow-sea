@@ -290,6 +290,36 @@ float ripAmount(vec2 p) { return smoothstep(-0.30, 0.20, fbm(p * 0.8 + u_s0)); }
 // where the reefs grow: a cheap two-octave field (it is looked up for every nearby coral cell)
 float reefField(vec2 p) { return 0.65 * gnoise(p * 1.1 + u_s1 * 1.7 + 4.0) + 0.3 * gnoise(p * 2.6 - u_s3 * 1.3); }
 
+// a branching coral colony seen from above, in units of its radius: n0 branches fork in two at each of lv levels,
+// out to an outline that swells and dips around it; spread 2 folds them into a half-round fan. Returns the distance
+// to the nearest branch; t is how far out along it, lat the offset across it (in half-widths), dir its heading
+float coralBranches(vec2 q, float n0, float lv, float w0, float w1, float spread, float sd,
+                    out float t, out float lat, out vec2 dir) {
+  float r = length(q), th = atan(q.y, q.x) * spread;
+  float k = min(floor(r * lv), lv - 1.0), nk = n0 * exp2(k);
+  float u = (th + 3.14159265) / 6.2831853 * nk, j0 = floor(u);
+  float best = 9.0;
+  t = 0.0; lat = 0.0; dir = vec2(1.0, 0.0);
+  for (int c = 0; c < 2; c++) {                       // the branch in this sector and the nearer neighbour
+    float j = j0 + (c == 0 ? 0.0 : fract(u) < 0.5 ? -1.0 : 1.0);
+    j = spread > 1.5 ? clamp(j, 0.0, nk - 1.0) : mod(j, nk);
+    float ang = (j + 0.5 + 0.7 * (hash21(vec2(j, k) + sd) - 0.5)) * 6.2831853 / nk - 3.14159265;
+    if (k > 0.5) {                                    // it forks off its parent's line early in this level
+      float pj = floor(j * 0.5);
+      float pang = (pj + 0.5 + 0.7 * (hash21(vec2(pj, k - 1.0) + sd) - 0.5)) * 12.566371 / nk - 3.14159265;
+      ang = mix(pang, ang, smoothstep(k / lv, (k + 0.7) / lv, r));
+    }
+    ang += 0.17 * sin(r * 7.0 + ang * 3.0 + sd);
+    float rm = 0.74 + 0.15 * sin(ang * 3.0 + sd) + 0.11 * sin(ang * 5.0 - sd * 1.7);
+    float da = th - ang;
+    if (spread < 1.5) da = mod(da + 3.14159265, 6.2831853) - 3.14159265;
+    float l = r * da / spread, w = mix(w0, w1, min(r, 1.0));
+    float dd = length(vec2(l, max(r - rm, 0.0))) - w;   // rounded growing tips
+    if (dd < best) { best = dd; t = min(r / rm, 1.0); lat = l / w; ang /= spread; dir = vec2(cos(ang), sin(ang)); }
+  }
+  return best;
+}
+
 // water depth in screen heights, negative on the beach; s is the coast coordinate
 float depthAt(vec2 p, out float s) {
   if (u_shore.z <= 0.0) {
@@ -415,7 +445,7 @@ void main() {
   }
 
   // coral reefs: in patches at the clear middle depths a bed of coral rubble, crowded with colonies of every shape
-  float coral = 0.0, coralH = 0.0;
+  float coral = 0.0, coralH = 0.0, bigTop = 0.0;
   if (u_coral > 0.5) {
     float depthOK = smoothstep(0.2, 0.34, D) * smoothstep(1.7, 1.2, D);
     float reefZ = smoothstep(-0.05, 0.3, reefField(p)) * depthOK;
@@ -497,6 +527,75 @@ void main() {
       col = mix(col, cc * (0.6 + 0.5 * max(dot(rnm, vec3(R * L.xy, L.z)), 0.0)), a);
       coral = max(coral, a);
       coralH = max(coralH, hgt * min(r / 0.03, 1.0) * a);
+    }
+
+    // now and then a coral garden crowds a mound out in the deeper water: antler-branched staghorns, fine bushy
+    // colonies and lacy sea fans in orange, pink, lilac and white, packed together and lifted close to the light
+    {
+      const float bs = 0.55;
+      vec2 bc = floor(p / bs);
+      vec2 hb = hash22(bc + u_s2 * 2.3 + 5.0), hb2 = hash22(bc + 71.3);
+      float Rg = 0.12 + 0.05 * hb2.x;
+      vec2 cen = (bc + 0.33 + 0.34 * hb) * bs;           // kept inside its cell, so only this cell can reach p
+      float sB;
+      float Db = depthAt(cen, sB);
+      if (hb2.y < 0.6 && Db > 0.7 && Db < 2.6) {
+        vec2 gq = (p - cen) / Rg;
+        float gw = 0.25 * gnoise(gq * 1.6 + bc * 3.0);
+        float gm = length(gq) + gw, gA = smoothstep(1.1, 0.7, gm);
+        // the mound itself, a rise of coral rubble crusted with algae
+        vec3 rubG = mix(vec3(0.56, 0.53, 0.43), vec3(0.40, 0.42, 0.30), smoothstep(-0.3, 0.5, gnoise(p * 23.0 + bc)));
+        col = mix(col, rubG * (0.75 + 0.3 * smoothstep(-0.5, 0.6, gnoise(p * 70.0 + bc))) * mix(1.0, lam, 0.9), gA * 0.9);
+        coral = max(coral, gA);
+        bigTop = smoothstep(1.15, 0.45, gm);                 // rising gently out of the deep
+        const float gs = 0.042;
+        vec2 gi = floor(p / gs);
+        float zb = 0.0;                                    // the height of what is drawn so far: taller branches win
+        for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+          vec2 c = gi + vec2(float(i), float(j));
+          vec2 hc = hash22(c + 31.7), hk = hash22(c + 63.1);
+          vec2 bcen = (c + 0.2 + 0.6 * hc) * gs, bg = (bcen - cen) / Rg;
+          if (length(bg) + 0.25 * gnoise(bg * 1.6 + bc * 3.0) > 0.85 || hk.x > 0.97) continue;
+          float Rk = gs * (0.9 + 0.3 * fract(hk.x * 7.3));
+          mat2 Rq = rot(hc.x * 6.2831853);
+          vec2 q = Rq * (p - bcen) / Rk;
+          if (zb == 0.0) col *= 1.0 - 0.35 * smoothstep(1.0, 0.25, length(q - Rq * sdir * 0.35));   // its shade below
+          if (dot(q, q) > 1.1) continue;
+          float pal = fract(hc.y * 5.7), sd = hk.x * 37.0 + hc.y * 11.0;
+          bool fan = hk.y > 0.8, antler = hk.y < 0.3, fluffy = hk.y > 0.55 && !fan;
+          float t, lat;
+          vec2 dir;
+          float dist = coralBranches(q, antler || fluffy ? 5.0 : fan ? 4.0 : 6.0, antler ? 3.0 : fluffy ? 5.0 : 4.0,
+                                     antler ? 0.1 : fan ? 0.04 : fluffy ? 0.055 : 0.07,
+                                     antler ? 0.055 : fan ? 0.02 : fluffy ? 0.03 : 0.038,
+                                     fan ? 2.0 : 1.0, sd, t, lat, dir);
+          float a = smoothstep(u_px / Rk, -u_px / Rk, dist);
+          if (fan) {                                       // the fine mesh strung between a sea fan's ribs, a pale veil
+            float veil = 0.3 * step(0.0, q.x) * smoothstep(0.99, 0.9, t);
+            if (veil > a) { a = veil; lat = 0.0; }
+          }
+          if (a <= 0.0) continue;
+          float cz = sqrt(max(1.0 - lat * lat, 0.0));
+          float hgt = (0.3 + 0.7 * t) * (fan ? 0.7 : 1.0) * (0.8 + 0.4 * hc.x) + 0.05 * cz;
+          if (hgt < zb) continue;
+          vec3 baseC = antler ? (pal < 0.35 ? vec3(0.95, 0.56, 0.38) : pal < 0.7 ? vec3(0.66, 0.54, 0.80) : vec3(0.86, 0.82, 0.72))
+                     : fan ? (pal < 0.6 ? vec3(0.90, 0.90, 0.93) : vec3(0.82, 0.76, 0.92))
+                     : fluffy ? (pal < 0.4 ? vec3(0.98, 0.58, 0.32) : pal < 0.75 ? vec3(0.95, 0.55, 0.70) : vec3(0.90, 0.40, 0.42))
+                     : (pal < 0.35 ? vec3(0.95, 0.52, 0.30) : pal < 0.7 ? vec3(0.90, 0.46, 0.62) : vec3(0.72, 0.40, 0.66));
+          vec3 tipC = antler ? (pal < 0.35 ? vec3(1.0, 0.82, 0.70) : pal < 0.7 ? vec3(0.80, 0.78, 1.0) : vec3(0.70, 0.84, 1.0))
+                    : fan ? vec3(1.0)
+                    : fluffy ? (pal < 0.4 ? vec3(1.0, 0.80, 0.60) : pal < 0.75 ? vec3(1.0, 0.78, 0.88) : vec3(1.0, 0.70, 0.66))
+                    : (pal < 0.35 ? vec3(1.0, 0.75, 0.55) : pal < 0.7 ? vec3(1.0, 0.70, 0.82) : vec3(0.92, 0.66, 0.90));
+          vec3 nb = normalize(vec3(vec2(-dir.y, dir.x) * lat * 0.8, cz + 0.25));
+          vec3 cc = mix(baseC, tipC, smoothstep(0.6, 1.0, t)) * (0.6 + 0.4 * t);   // paler growing tips, shaded depths
+          cc *= 0.85 + 0.25 * gnoise(p * 480.0 + c);                              // the fuzz of polyps
+          cc *= 0.55 + 0.6 * max(dot(nb, vec3(Rq * L.xy, L.z)), 0.0);
+          col = mix(col, cc, a);
+          zb = max(zb, hgt * step(0.5, a));
+          coral = max(coral, a);
+          bigTop = max(bigTop, a);
+        }
+      }
     }
   }
 
@@ -591,6 +690,7 @@ void main() {
   rockH = max(rockH, coralH * 0.9);
   if (u_shore.z <= 0.0) D = clamp(D - rockH * 0.16, 0.12, 1.0);
   else if (s > 0.0) D = max(D - rockH * 0.16, 0.01);
+  D = mix(D, min(D, 0.16), bigTop);                // a big coral head comes up close to the surface
   o = vec4(col, D);
 }`;
 
