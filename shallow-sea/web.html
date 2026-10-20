@@ -310,9 +310,9 @@
       },
       "quality": {
         "text": "畫質",
-        "help": "顯示卡較弱或 4K 螢幕可調低",
+        "help": "顯示卡較弱或螢幕很大時可調低：在 2560×1600 螢幕上 75% 看起來幾乎一樣，顯示卡負擔少約三分之一",
         "items": [
-          "高（原生解析度）",
+          "高（一律原生解析度）",
           "中（75%）",
           "低（50%）"
         ]
@@ -323,7 +323,7 @@
       },
       "fps30": {
         "text": "鎖定 30 FPS",
-        "help": "降低耗電"
+        "help": "降低耗電；不勾選時最高 60 FPS"
       }
     };
     // help text that only makes sense inside Lively, reworded for the web
@@ -367,9 +367,9 @@
       sound: { text: 'Wave sounds', help: 'Surf in step with the picture; tapping the water makes a plop too' },
       volume: { text: 'Volume' },
       labelPerf: { value: 'Performance' },
-      quality: { text: 'Quality', help: 'Lower it on a slow graphics card or a 4K screen',
-                 items: ['High (native resolution)', 'Medium (75%)', 'Low (50%)'] },
-      fps30: { text: 'Limit to 30 FPS', help: 'Uses less power' },
+      quality: { text: 'Quality', help: 'Lower it on a slow graphics card or a very large screen: on a 2560×1600 screen 75% looks almost the same and uses about a third less of the graphics card',
+                 items: ['High (always native resolution)', 'Medium (75%)', 'Low (50%)'] },
+      fps30: { text: 'Limit to 30 FPS', help: 'Uses less power; otherwise up to 60 FPS' },
       idleSave: { text: 'Save power when idle', help: 'Drops to 30 FPS after 45 seconds without the mouse, back to full speed as soon as it moves' },
     };
 

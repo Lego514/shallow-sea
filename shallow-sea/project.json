@@ -279,7 +279,7 @@
         "order": 440,
         "options": [
           {
-            "label": "High (native resolution) 高（原生解析度）",
+            "label": "High (always native resolution) 高（一律原生解析度）",
             "value": "0"
           },
           {

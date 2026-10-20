@@ -79,6 +79,7 @@ const QUALITY = [
   { scale: 0.75, sim: 256 },
   { scale: 0.5, sim: 192 },
 ];
+const MAX_FPS = 60;            // nothing here needs more, and a 240 Hz screen would otherwise get 240
 if (Q.has('hour')) { S.timeMode = -1; }
 if (Q.has('fish')) S.fish = +Q.get('fish');
 if (Q.has('rain')) S.rain = +Q.get('rain');
@@ -2691,6 +2692,7 @@ function updateInput(dt) {
     mouse.px = mouse.x; mouse.py = mouse.y;
     return;
   }
+  if (dt <= 0) return;                       // a test frame that does not move the clock
   const k = 1 - Math.exp(-dt * 12);
   mouse.vx += (dx / dt - mouse.vx) * k;
   mouse.vy += (dy / dt - mouse.vy) * k;
@@ -2760,7 +2762,7 @@ function steerHeading(f, dt, maxTurn) {
     const da = wrapAngle(Math.atan2(f.vy, f.vx) - f.ang);
     const step = Math.max(-maxTurn * dt, Math.min(maxTurn * dt, da));
     f.ang = wrapAngle(f.ang + step);
-    f.angVel += (step / dt - f.angVel) * Math.min(1, dt * 8);
+    if (dt > 0) f.angVel += (step / dt - f.angVel) * Math.min(1, dt * 8);
   }
   return sp;
 }
@@ -3813,13 +3815,13 @@ let stepping = false;               // test hook: the clock only moves when a fr
 let paused = false;                 // Wallpaper Engine tells us when it pauses the wallpaper
 const IDLE_AFTER = 45;              // seconds without the mouse before the wallpaper slows to 30 FPS
 
-// whether the loop should draw at this timestamp: full speed, or 30 FPS when locked or idle
+// whether the loop should draw at this timestamp: up to 60 FPS, or 30 when locked or idle
 function wantsFrame(now) {
   if (stepping || paused) return false;
   const idle = S.idleSave && time - mouse.lastMove > IDLE_AFTER && !mouse.down;
-  let cap = S.fpsLimit > 0 ? S.fpsLimit : 0;              // Wallpaper Engine's frame-rate setting
-  if (S.fps30 || idle) cap = cap ? Math.min(cap, 30) : 30;
-  return !cap || now - lastDraw >= 1000 / cap - 3;
+  let cap = S.fpsLimit > 0 ? S.fpsLimit : MAX_FPS;         // or Wallpaper Engine's own frame-rate setting
+  if (S.fps30 || idle) cap = Math.min(cap, 30);
+  return now - lastDraw >= 1000 / cap - 3;
 }
 
 function frame(now) {

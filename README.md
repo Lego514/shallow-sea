@@ -73,7 +73,7 @@ Wallpaper Engine has no buttons in its settings, so **New seabed** and **Show se
 - **Corals**, small fish, big fish, rays, sea turtles (green, hawksbill, olive ridley), **dolphins**, **reef sharks**, jellyfish, hermit crabs & gulls, **turtle hatchlings**, floating flowers & leaves, **feed the fish**.
 - **Wave sounds** (off by default) and **volume**: surf in step with the picture, and a plop when you tap the water.
 - **Save power when idle** (on by default): after 45 seconds without the mouse it drops to 30 FPS, and is back to full speed as soon as the mouse moves.
-- **Quality** and **limit to 30 FPS**: turn these down on a slow graphics card or on battery.
+- **Quality** and **limit to 30 FPS**: turn these down on a slow graphics card or on battery. It never draws more than 60 FPS, even on a high-refresh screen. On a 2560×1600 laptop at 30 FPS it uses about 38% of an Intel Arc 140T at native resolution, about 25% at 75% and about 18% at 50%.
 
 Lively itself can pause the wallpaper entirely: in Lively's **Settings → Performance**, choose what happens while a fullscreen app runs, while another app has focus, and on battery.
 
@@ -162,7 +162,7 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 - **珊瑚**、小魚數量、大魚、魟魚、海龜（三種）、**海豚**、水母數量、寄居蟹與海鷗、**小海龜孵化**、漂浮的花與葉、**餵魚**
 - **海浪聲**（預設關閉）與**音量**
 - **閒置時省電**（預設開）：滑鼠 45 秒沒動就降到 30 FPS，一動馬上恢復
-- **畫質／鎖定 30 FPS**：顯示卡較弱或用電池時可以調低
+- **畫質／鎖定 30 FPS**：顯示卡較弱或用電池時可以調低。不論螢幕更新率多高，最多只畫 60 FPS。在 2560×1600 筆電、30 FPS 下，原生解析度約佔 Intel Arc 140T 的 38%，75% 約 25%，50% 約 18%
 
 Lively 本身也能讓桌布完全暫停：在 Lively 的「設定 → 效能」可以設定有全螢幕程式、其他程式在前景、用電池時要不要暫停。
 

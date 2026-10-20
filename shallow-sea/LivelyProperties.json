@@ -212,9 +212,9 @@
     "type": "dropdown",
     "value": 0,
     "text": "Quality 畫質",
-    "help": "Lower it on a slow graphics card or a 4K screen. 顯示卡較弱或 4K 螢幕可調低",
+    "help": "Lower it on a slow graphics card or a very large screen: on a 2560×1600 screen 75% looks almost the same and uses about a third less of the graphics card. 顯示卡較弱或螢幕很大時可調低：在 2560×1600 螢幕上 75% 看起來幾乎一樣，顯示卡負擔少約三分之一",
     "items": [
-      "High (native resolution) 高（原生解析度）",
+      "High (always native resolution) 高（一律原生解析度）",
       "Medium (75%) 中（75%）",
       "Low (50%) 低（50%）"
     ]
@@ -229,6 +229,6 @@
     "type": "checkbox",
     "value": false,
     "text": "Limit to 30 FPS 鎖定 30 FPS",
-    "help": "Uses less power. 降低耗電"
+    "help": "Uses less power; otherwise up to 60 FPS. 降低耗電；不勾選時最高 60 FPS"
   }
 }
