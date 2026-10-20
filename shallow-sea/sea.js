@@ -851,7 +851,7 @@ void main() {
   else if (sp < 5.5) { ext = vec2(1.5, 1.0); off = vec2(-1.0, 0.0); }    // eagle ray, long tail behind
   else if (sp < 6.5) { ext = vec2(0.56, 1.18); off = vec2(-0.08, 0.0); } // manta
   else if (sp < 7.5) ext = vec2(0.62, 0.62);                             // moon jelly
-  else if (sp < 8.5) { ext = vec2(1.4, 0.66); off = vec2(-0.85, 0.0); } // sea nettle, tentacles trailing
+  else if (sp < 8.5) { ext = vec2(0.72, 0.62); off = vec2(-0.2, 0.0); }  // spotted lagoon jelly, arms trailing
   else if (sp < 9.5) { ext = vec2(0.74, 0.88); off = vec2(0.06, 0.0); } // sea turtle
   else if (sp < 10.5) ext = vec2(0.62, 0.62);                            // hermit crab
   else if (sp < 11.5) { ext = vec2(0.66, 1.0); off = vec2(-0.08, 0.0); } // gull (only its shadow is drawn)
@@ -1142,36 +1142,54 @@ vec4 moonJelly(vec2 q, out float sha) {
   return c;
 }
 
-// Pacific sea nettle from above: a golden-amber bell with dark red-brown stripes radiating out to a scalloped rim,
-// pale ruffled oral arms and long, thin maroon tentacles trailing behind as it swims. It pulses (y.phase)
-vec4 seaNettle(vec2 q, out float sha) {
-  float ph = v_b.y, aa = fwidth(q.x) + v_blur, seed = v_c.w * 6.28;
-  float pulse = 0.5 + 0.5 * sin(ph);
+// spotted lagoon jelly (Mastigias papua) from above: a plump, see-through dome, golden-olive or blue, dusted with
+// white spots that grow bigger toward the top and a softly scalloped rim. Through it show eight stubby oral arms that
+// trail a little way behind as it swims, each ending in a pale club; no long stinging tentacles. It pulses (y.phase)
+float g_glow = -1.0;                                          // a sprite's own night glow, when it sets one
+vec4 lagoonJelly(vec2 q, out float sha) {
+  float ph = v_b.y, aa = fwidth(q.x) + v_blur, seed = v_c.w * 6.2831853;
+  float pulse = 0.5 + 0.5 * sin(ph);                          // 1 relaxed, 0 contracted
   float R = 0.5 * (0.86 + 0.14 * pulse);
-  float r = length(q), ang = atan(q.y, q.x);
-  float edge = R * (1.0 + 0.035 * abs(sin(ang * 8.0 + seed)));
+  vec2 d = vec2(q.x * (1.0 + 0.08 * (1.0 - pulse)), q.y);
+  float r = length(d), ang = atan(d.y, d.x);
+  float edge = R * (1.0 - 0.03 * abs(sin(ang * 8.0 + seed)));
   float bell = smoothstep(aa, -aa, r - edge);
-  float stripe = smoothstep(0.75, 0.95, cos(ang * 16.0 + seed)) * smoothstep(R * 0.25, R * 0.55, r);
-  vec3 bc = mix(vec3(1.0, 0.48, 0.16), vec3(1.0, 0.75, 0.45), smoothstep(R * 0.45, 0.0, r));
-  bc = mix(bc, vec3(0.55, 0.12, 0.08), stripe * 0.8);
-  bc = mix(bc, vec3(0.85, 0.4, 0.15), smoothstep(R * 0.8, R, r) * 0.5);
-  vec4 c = vec4(bc, 1.0) * bell * (0.8 + 0.15 * smoothstep(R * 0.5, R, r));
-  float x = -q.x;                                             // distance behind the bell
-  float tent = 0.0;
-  for (int k = 0; k < 10; k++) {
-    float fk = float(k), u = clamp(x / 2.1, 0.0, 1.0);
-    float yy = (fk / 9.0 - 0.5) * R * 1.8 * (1.0 - 0.45 * u) + (0.05 + 0.03 * sin(fk * 1.7)) * sin(x * 4.0 - ph * 0.8 + fk * 1.3) * x;
-    float w = mix(0.012, 0.005, u);
-    tent = max(tent, smoothstep(w + aa, w - aa, abs(q.y - yy)) * smoothstep(R * 0.5, R * 0.8, x) * (1.0 - u) * smoothstep(2.15, 1.6 + 0.4 * sin(fk * 2.3), x));
+  float dome = sqrt(max(1.0 - (r / edge) * (r / edge), 0.0));
+  bool blue = v_c.w < 0.35;
+  vec3 base = blue ? vec3(0.42, 0.62, 0.88) : vec3(0.90, 0.62, 0.30);
+
+  // the oral arms hang below the bell and drift back as it swims: eight short ribbons ending in pale clubs
+  float arms = 0.0, club = 0.0;
+  for (int k = 0; k < 8; k++) {
+    float fk = float(k), side = (fk + 0.5) / 8.0 - 0.5;
+    vec2 a0 = vec2(R * 0.05, side * R * 0.7);
+    vec2 a1 = vec2(-R * (1.25 + 0.15 * sin(fk * 2.3 + seed)), side * R * 1.25) + vec2(0.0, 0.05 * sin(ph * 0.7 + fk * 1.9));
+    vec2 ab = a1 - a0, ap = q - a0;
+    float t = clamp(dot(ap, ab) / dot(ab, ab), 0.0, 1.0);
+    vec2 off = ap - ab * t;
+    float w = R * mix(0.09, 0.06, t) * (1.0 + 0.25 * sin(t * 18.0 + fk));    // frilled along its length
+    arms = max(arms, smoothstep(w + aa, w - aa, length(off)));
+    club = max(club, smoothstep(R * 0.1 + aa, R * 0.1 - aa, length(q - a1)));
   }
-  float arms = 0.0;
-  for (int k = 0; k < 4; k++) {
-    float fk = float(k);
-    float yy = (fk / 3.0 - 0.5) * R * 0.45 + 0.05 * sin(x * 3.0 - ph * 0.6 + fk * 2.1) * x;
-    float w = R * 0.09 * (1.0 + 0.5 * sin(x * 45.0 + fk * 3.0)) * (1.0 - 0.6 * clamp(x / 1.3, 0.0, 1.0));
-    arms = max(arms, smoothstep(w + aa, w - aa, abs(q.y - yy)) * step(0.0, x) * smoothstep(1.35, 0.7, x));
-  }
-  c = over(c, over(vec4(1.0, 0.94, 0.88, 1.0) * arms * 0.55, vec4(0.6, 0.16, 0.1, 1.0) * tent * 0.85));
+  vec4 c = vec4(base * 0.62, 1.0) * arms * 0.8;
+  c = over(vec4(vec3(0.95, 0.92, 0.84), 1.0) * club * 0.85, c);
+
+  // the dome: deeper in colour toward the top, its edge clearer, and over it the white spots
+  vec3 bc = base * (0.7 + 0.4 * dome);
+  // scattered, not in rows: a turned grid, each spot jittered well off its cell's centre, some cells left bare
+  vec2 g = rot(0.6 + seed) * d / R * 5.0 + seed * 3.0, ci = floor(g);
+  vec2 h = hash22(ci);
+  float rs = (0.1 + 0.13 * dome) * (0.55 + 0.9 * h.y) * step(0.18, fract(h.x * 7.3));
+  float spot = smoothstep(rs + 0.05, rs - 0.05, length(g - ci - 0.5 - (h - 0.5) * 0.62));
+  spot *= smoothstep(R * 0.97, R * 0.8, r);
+  bc = mix(bc, vec3(0.98, 0.96, 0.9), spot);
+  float rim = smoothstep(R * 0.12, 0.0, abs(r - edge * 0.96)) * bell;
+  bc = mix(bc, base * 1.25 + 0.08, rim * 0.5);
+  bc += vec3(0.25) * smoothstep(0.55, 0.0, length(d / R - vec2(0.3, 0.32))) * dome;   // sheen on the dome
+  vec4 bellC = vec4(bc, 1.0) * bell * mix(0.55, 0.85, max(dome, spot));
+  c = over(bellC, c);
+  // at night the spots, the rim and the clubs glow; the clear dome between them barely does
+  g_glow = clamp(spot * bell * 0.9 + rim * 0.6 + club * 0.8 + bell * 0.12, 0.0, 1.0);
   sha = c.a * 0.4;
   return c;
 }
@@ -1554,7 +1572,7 @@ void main() {
   else if (sp < 5.5) c = eagleRay(v_q, sha);
   else if (sp < 6.5) c = manta(v_q, sha);
   else if (sp < 7.5) c = moonJelly(v_q, sha);
-  else if (sp < 8.5) c = seaNettle(v_q, sha);
+  else if (sp < 8.5) c = lagoonJelly(v_q, sha);
   else if (sp < 9.5) c = turtle(v_q, sha);
   else if (sp < 10.5) c = hermitCrab(v_q, sha);
   else if (sp < 11.5) c = gull(v_q, sha);
@@ -1563,7 +1581,7 @@ void main() {
   else if (sp < 14.5) c = spray(v_q, sha);
   else c = hatchling(v_q, sha);
   if (u_shadow == 1) o = vec4(sha, 0.0, 0.0, sha);
-  else if (u_shadow == 2) o = vec4(0.0, sp > 6.5 && sp < 8.5 ? min(c.a * 1.8, 1.0) : 0.0, 0.0, 0.0);   // jellyfish glow
+  else if (u_shadow == 2) o = vec4(0.0, sp > 6.5 && sp < 8.5 ? (g_glow >= 0.0 ? g_glow : min(c.a * 1.8, 1.0)) : 0.0, 0.0, 0.0);   // jellyfish glow
   else o = c;
 }`;
 
@@ -2308,7 +2326,7 @@ function newJelly(x, y) {
   if (x === undefined) [x, y] = randomWaterPoint(0.45);
   return {
     kind, x, y, ang: rand(0, TAU), turn: rand(-0.15, 0.15), vx: 0, vy: 0,
-    len: kind === 7 ? rand(0.08, 0.11) : rand(0.065, 0.085),
+    len: kind === 7 ? rand(0.08, 0.11) : rand(0.085, 0.105),
     phase: rand(0, TAU), rate: rand(0.55, 0.85) * TAU, depth: rand(0.22, 0.45), extra: Math.random(),
   };
 }
