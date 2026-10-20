@@ -22,6 +22,7 @@ const MAX_PELLETS = 60;
 const MAX_DOLPHINS = 6;
 const MAX_SPRAY = 8;
 const MAX_HATCH = 12;
+const MAX_SHARKS = 2;
 
 const canvas = document.getElementById('sea');
 const msgEl = document.getElementById('msg');
@@ -58,6 +59,7 @@ const S = {
   hatchlings: true,            // on some nights a nest of sea turtles hatches on the beach
   feed: true,                  // hold still on the water to sprinkle fish food
   dolphins: true,              // a pod passes through the deep water every few minutes
+  sharks: true,                // a blacktip reef shark patrols the reef edge now and then
   tide: true,
   sound: false,
   volume: 0.48,
@@ -858,7 +860,8 @@ void main() {
   else if (sp < 12.5) ext = vec2(0.62, 0.62);                            // a crumb of fish food
   else if (sp < 13.5) { ext = vec2(0.6, 0.3); off = vec2(-0.03, 0.0); } // dolphin
   else if (sp < 14.5) ext = vec2(1.0, 1.0);                              // whitewater from a leap
-  else ext = vec2(0.62, 0.62);                                           // turtle hatchling
+  else if (sp < 15.5) ext = vec2(0.62, 0.62);                            // turtle hatchling
+  else { ext = vec2(0.58, 0.3); off = vec2(-0.02, 0.0); }               // reef shark
   vec2 pos = i_a.xy;
   vec2 uv = clamp(vec2(pos.x / u_aspect, pos.y), 0.0, 1.0);
   float blur = 0.0;
@@ -1405,6 +1408,70 @@ vec4 pellet(vec2 q, out float sha) {
   return vec4(c * a, a);
 }
 
+// blacktip reef shark seen from above, in body lengths: snout at x = 0.5, tail tip at x = -0.5. A slim torpedo
+// in warm grey with a rounded snout, broad sickle-shaped pectoral fins, and black tips on its fins; it swims by
+// sweeping its body from side to side, the sweep growing toward the tail (y.phase), and curves into turns (z.bend)
+float sharkW(float x) {
+  float t = clamp((x + 0.36) / 0.86, 0.0, 1.0);                // 0 at the tail stock, 1 at the snout
+  float sn = max(sin(3.14159265 * pow(t, 1.15)), 0.0);
+  return 0.01 + 0.062 * pow(sn, 0.72);
+}
+// a fin from a root on the body out to a pointed tip, swept back along a gentle curve; returns distance, out the
+// share of the way out to the tip
+float sharkFin(vec2 p, vec2 root, vec2 dir, float len, float w0, float curve, out float t) {
+  vec2 rel = p - root;
+  float al = dot(rel, dir), ac = dot(rel, vec2(dir.y, -dir.x)) + curve * al * max(al, 0.0);
+  t = clamp(al / len, 0.0, 1.0);
+  float w = w0 * pow(max(1.0 - al / len, 0.0), 0.6);
+  return max(abs(ac) - w, max(-al - 0.01, al - len));
+}
+float sminK(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+vec4 shark(vec2 q, out float sha) {
+  float ph = v_b.y, bend = v_b.z, aa = fwidth(q.x) + v_blur;
+  float sweep = smoothstep(0.3, -0.5, q.x);
+  q.y -= bend * 0.35 * (q.x - 0.25) * (q.x - 0.25) + 0.045 * sweep * sweep * sin(ph + q.x * 6.0);
+  float ay = abs(q.y);
+  float w = sharkW(q.x);
+  float dBody = max(ay - w, max(q.x - 0.5, -0.37 - q.x));
+  vec2 qa = vec2(q.x, ay);
+  float tP, tV, tC;
+  float dPec = sharkFin(qa, vec2(0.16, 0.045), normalize(vec2(-0.55, 0.84)), 0.25, 0.06, 1.5, tP);
+  float dPel = sharkFin(qa, vec2(-0.16, 0.02), normalize(vec2(-0.7, 0.71)), 0.08, 0.022, 1.0, tV);
+  // the tail fin stands upright, so from above it is a narrow, slightly curved blade trailing from the tail stock
+  float dCaud = sharkFin(vec2(q.x, q.y), vec2(-0.34, 0.0), vec2(-1.0, 0.0), 0.17, 0.02, 0.6, tC);
+  float d = sminK(sminK(dBody, dPec, 0.012), min(dPel, dCaud), 0.008);
+  float a = smoothstep(aa, -aa, d);
+  float trunk = smoothstep(aa, -aa, dBody);
+  vec3 back = v_c.rgb, flank = back * 1.22 + vec3(0.03, 0.03, 0.025);
+  float wx = max(sharkW(clamp(q.x, -0.37, 0.45)), 0.012);
+  float yw = clamp(q.y / wx, -1.0, 1.0), nz = sqrt(max(1.0 - yw * yw, 0.0));
+  vec3 c = mix(back, flank, smoothstep(0.45, 0.95, abs(yw)) * trunk);
+  c *= mix(0.85, 0.66 + 0.42 * nz, trunk);
+  // fins: a shade darker, with the black tips that give the shark its name
+  float fins = (1.0 - trunk) * a;
+  c = mix(c, back * 0.9, fins);
+  float tip = max(smoothstep(0.72, 0.9, tP) * step(dPec, 0.0), smoothstep(0.6, 0.85, tC) * step(dCaud, 0.0));
+  c = mix(c, vec3(0.06, 0.06, 0.07), tip * 0.9);
+  // the first dorsal fin, upright and seen edge-on: a thin ridge down the spine, black at its tip, with a soft
+  // shadow at its foot; the small second dorsal near the tail
+  float fd = clamp((q.x + 0.1) / 0.17, 0.0, 1.0), inFin = smoothstep(-0.115, -0.09, q.x) * smoothstep(0.08, 0.055, q.x);
+  float fwid = 0.0015 + 0.0032 * smoothstep(0.0, 0.6, fd) * (1.0 - smoothstep(0.85, 1.0, fd));
+  c *= 1.0 - 0.1 * smoothstep(0.014, 0.0, ay - fwid) * inFin;
+  c = mix(c, mix(vec3(0.07), back * 0.72, smoothstep(0.0, 0.3, fd)), smoothstep(aa, -aa, ay - fwid) * inFin);
+  c = mix(c, back * 0.55, smoothstep(aa, -aa, ay - 0.004) * smoothstep(-0.3, -0.285, q.x) * smoothstep(-0.25, -0.265, q.x));
+  // eyes, and the faint gill slits on the flanks
+  c = mix(c, vec3(0.05), smoothstep(0.008, 0.005, length(qa - vec2(0.37, sharkW(0.37) * 0.82))));
+  float gill = smoothstep(0.004, 0.0, abs(fract((q.x - 0.24) / 0.022) - 0.5) * 0.022) * step(0.24, q.x) * step(q.x, 0.33);
+  c *= 1.0 - 0.18 * gill * smoothstep(0.55, 0.85, abs(yw)) * trunk;
+  // the sheen of light along the back
+  c += vec3(0.75, 0.8, 0.85) * 0.07 * exp(-pow((yw - 0.3) / 0.15, 2.0)) * trunk * smoothstep(-0.3, 0.0, q.x);
+  sha = a * 0.85;
+  return vec4(c * a, a);
+}
+
 // bottlenose dolphin seen from above, in body lengths: beak tip at x = 0.5, fluke tips near x = -0.52.
 // Half-width of the body: a blunt rounded head, widest just behind the flippers, a long taper into the tail stock
 float dolphinW(float x) {
@@ -1579,7 +1646,8 @@ void main() {
   else if (sp < 12.5) c = pellet(v_q, sha);
   else if (sp < 13.5) c = dolphin(v_q, sha);
   else if (sp < 14.5) c = spray(v_q, sha);
-  else c = hatchling(v_q, sha);
+  else if (sp < 15.5) c = hatchling(v_q, sha);
+  else c = shark(v_q, sha);
   if (u_shadow == 1) o = vec4(sha, 0.0, 0.0, sha);
   else if (u_shadow == 2) o = vec4(0.0, sp > 6.5 && sp < 8.5 ? (g_glow >= 0.0 ? g_glow : min(c.a * 1.8, 1.0)) : 0.0, 0.0, 0.0);   // jellyfish glow
   else o = c;
@@ -1969,7 +2037,7 @@ function makeBatch(max) {
   return { vao, buf, data: new Float32Array(max * 12), count: 0 };
 }
 const deepBatch = makeBatch(4);
-const fishBatch = makeBatch(MAX_FISH + 32 + MAX_PELLETS + MAX_DOLPHINS);
+const fishBatch = makeBatch(MAX_FISH + 32 + MAX_PELLETS + MAX_DOLPHINS + MAX_SHARKS);
 const floatBatch = makeBatch(MAX_FLOATS + 6 + MAX_PELLETS + MAX_DOLPHINS + MAX_SPRAY + MAX_HATCH);
 const skyBatch = makeBatch(6);
 
@@ -2418,6 +2486,10 @@ function splash(x, y, power) {
       f.vx += dx / d * 0.35 * k; f.vy += dy / d * 0.35 * k;
     }
   }
+  for (const k of sharks) {
+    const dx = k.x - x, dy = k.y - y, d = Math.hypot(dx, dy) + 1e-4;
+    if (d < 0.4) { k.shy = 1; k.vx += dx / d * 0.08; k.vy += dy / d * 0.08; }
+  }
   for (const r of rays) {
     if (r.away > 0) continue;
     const dx = r.x - x, dy = r.y - y, d = Math.hypot(dx, dy) + 1e-4;
@@ -2585,6 +2657,11 @@ function updateFish(dt) {
         ay += -dy / d * pull + dx / d * 0.04;
         calm = d < ring * 2.5;
       }
+    }
+    // fish keep well clear of a cruising shark, and bolt when it comes close
+    for (const k of sharks) {
+      const dx = f.x - k.x, dy = f.y - k.y, dd = Math.hypot(dx, dy) + 1e-4;
+      if (dd < 0.3) { const kk = 1 - dd / 0.3; ax += dx / dd * 1.6 * kk; ay += dy / dd * 1.6 * kk; f.fear = Math.max(f.fear, 0.7 * kk); }
     }
     // dolphins hunt fish: the school scatters when one comes close
     for (const d of dolphins) {
@@ -2968,6 +3045,67 @@ function updateDolphins(dt) {
   if ((Math.hypot(lead.tx - lead.x, lead.ty - lead.y) < 0.3 && dolphins.every(off)) || podAge > 90) dolphins = [];
 }
 
+// ---------------------------------------------------------------- reef sharks: one, now and then two, patrol the reef edge
+let sharks = [];
+let sharkTimer = rand(50, 110), sharkAge = 0;
+function spawnSharks() {
+  const [sx, sy] = offscreenSeaPoint(0.35, 0.45);
+  let ex = aspect - sx, ey = 1 - sy, best = 0;
+  for (let i = 0; i < 24; i++) {
+    const [x, y] = offscreenSeaPoint(0.35, 0.6), dd = Math.hypot(x - sx, y - sy);
+    if (dd > best) { best = dd; ex = x; ey = y; }
+  }
+  const n = Math.random() < 0.3 ? 2 : 1, ang = Math.atan2(ey - sy, ex - sx);
+  sharks = [];
+  for (let i = 0; i < n; i++) {
+    const g = rand(-0.03, 0.03), back = i * rand(0.25, 0.4);
+    sharks.push({ x: sx - Math.cos(ang) * back, y: sy - Math.sin(ang) * back, ang, tx: ex, ty: ey,
+                  vx: Math.cos(ang) * 0.07, vy: Math.sin(ang) * 0.07, angVel: 0, bend: 0, len: rand(0.15, 0.19),
+                  phase: rand(0, TAU), beat: rand(0.75, 0.95), depth: rand(0.18, 0.26), wander: rand(0, TAU),
+                  shy: 0, col: [0.30 + g, 0.29 + g, 0.26 + g] });
+  }
+  sharkAge = 0;
+}
+// a shark cruises slowly toward the far side, keeping to the reef edge: away from the shallow sand and out of
+// the open deep, weaving a little as it goes; it turns away from a splash or a fast sweep of the cursor
+function updateSharks(dt) {
+  if (!S.sharks) { sharks = []; return; }
+  if (!sharks.length) {
+    sharkTimer -= dt;
+    if (sharkTimer <= 0) { spawnSharks(); sharkTimer = rand(90, 200); }
+    return;
+  }
+  sharkAge += dt;
+  for (const k of sharks) {
+    const onScreen = k.x > 0 && k.x < aspect && k.y > 0 && k.y < 1;
+    const dx = k.tx - k.x, dy = k.ty - k.y, dist = Math.hypot(dx, dy) + 1e-4, cruise = 0.07 * (1 + 1.5 * k.shy);
+    k.wander += dt * rand(-0.6, 0.6);
+    const wx = Math.cos(k.wander) * 0.35, wy = Math.sin(k.wander) * 0.35;
+    let ax = ((dx / dist + wx * 0.5) * cruise - k.vx) * 0.5, ay = ((dy / dist + wy * 0.5) * cruise - k.vy) * 0.5;
+    if (onScreen) {
+      const hx = k.x + Math.cos(k.ang) * 0.18, hy = k.y + Math.sin(k.ang) * 0.18, D = depthAt(hx, hy);
+      const [gx, gy] = deeperDir(k.x, k.y);
+      if (D < 0.3) { ax += gx * 0.12; ay += gy * 0.12; }
+      else if (D > 1.4) { ax -= gx * 0.06; ay -= gy * 0.06; }
+    }
+    if (mouse.inside && mouse.speed > 0.3 && onScreen) {
+      const mx = k.x - mouse.x, my = k.y - mouse.y, md = Math.hypot(mx, my) + 1e-4;
+      if (md < 0.2) { ax += mx / md * 0.3; ay += my / md * 0.3; k.shy = 1; }
+    }
+    k.vx += ax * dt; k.vy += ay * dt;
+    const sp = Math.hypot(k.vx, k.vy);
+    if (sp > 0.25) { k.vx *= 0.25 / sp; k.vy *= 0.25 / sp; }
+    k.x += k.vx * dt; k.y += k.vy * dt;
+    steerHeading(k, dt, 1.0);
+    k.bend += (Math.max(-0.5, Math.min(0.5, k.angVel * 0.3)) - k.bend) * Math.min(1, dt * 4);
+    k.phase += dt * TAU * k.beat * (1 + k.shy);
+    k.shy = Math.max(0, k.shy - dt * 0.4);
+  }
+  const off = k => k.x < -k.len || k.x > aspect + k.len || k.y < -k.len || k.y > 1 + k.len;
+  const lead = sharks[0];
+  if ((Math.hypot(lead.tx - lead.x, lead.ty - lead.y) < 0.3 && sharks.every(off)) || sharkAge > 110) sharks = [];
+}
+
 let gullTimer = rand(6, 20);
 function updateGulls(dt) {
   if (!S.beachLife) { gulls.length = 0; return; }
@@ -3163,6 +3301,7 @@ function packInstances() {
     if (l) put(d.x, d.y, d.ang, d.len * l.sc, 13, l.cut, l.fs, 0.05, d.col, l.mode + 2);   // what is still under water
     else put(d.x, d.y, d.ang, d.len, 13, d.phase, d.bend, d.depth, d.col, 0);
   }
+  for (const k of sharks) put(k.x, k.y, k.ang, k.len, 16, k.phase, k.bend, k.depth, k.col, 0);
   for (const f of fish) if (f.kind === 1) put(f.x, f.y, f.ang, f.len, 1, f.phase, f.bend, f.depth, f.col, f.extra);
   for (const f of fish) if (f.kind === 0) put(f.x, f.y, f.ang, f.len, 0, f.phase, f.bend, f.depth, f.col, f.extra);
   fishBatch.count = n;
@@ -3527,6 +3666,7 @@ function step(dt) {
   updatePellets(dt);
   updateGulls(dt);
   updateDolphins(dt);
+  updateSharks(dt);
   waveSounds();
   updateFloats(dt);
   updateRain(dt);
@@ -3599,6 +3739,7 @@ const PROPS = {
   hatchlings: v => { S.hatchlings = v === true || v === 'true'; if (!S.hatchlings) { hatchlings = []; nest = null; } },
   feedFish: v => { S.feed = v === true || v === 'true'; },
   dolphins: v => { S.dolphins = v === true || v === 'true'; if (!S.dolphins) dolphins = []; },
+  sharks: v => { S.sharks = v === true || v === 'true'; if (!S.sharks) sharks = []; },
   sound: v => { S.sound = v === true || v === 'true'; if (S.sound) audioStart(); audioLevel(); },
   volume: v => { S.volume = v / 100 * 0.8; audioLevel(); },
 };
@@ -3640,6 +3781,8 @@ window.sea = { splash: (x, y) => splash(x * aspect, 1 - y, 1), regenerate, setti
   get paused() { return paused; },
   get pellets() { return pellets; },
   get dolphins() { return dolphins; },
+  get sharks() { return sharks; },
+  spawnSharks: () => { spawnSharks(); },
   spawnDolphins: () => { spawnPod(); },
   leapDolphin: i => { const d = dolphins[i ?? 1] || dolphins[0]; if (d && !d.leap) startLeap(d); return !!d; },
   get sprays() { return sprays; },

@@ -212,23 +212,29 @@
         "value": true,
         "order": 330
       },
+      "sharks": {
+        "type": "bool",
+        "text": "Reef sharks 礁鯊",
+        "value": true,
+        "order": 340
+      },
       "beachlife": {
         "type": "bool",
         "text": "Hermit crabs & gulls 寄居蟹與海鷗",
         "value": true,
-        "order": 340
+        "order": 350
       },
       "hatchlings": {
         "type": "bool",
         "text": "Turtle hatchlings 小海龜孵化",
         "value": true,
-        "order": 350
+        "order": 360
       },
       "feedfish": {
         "type": "bool",
         "text": "Feed the fish 餵魚",
         "value": true,
-        "order": 360
+        "order": 370
       },
       "jellycount": {
         "type": "slider",
@@ -238,7 +244,7 @@
         "value": 6,
         "fraction": false,
         "editable": true,
-        "order": 370
+        "order": 380
       },
       "floatcount": {
         "type": "slider",
@@ -248,13 +254,13 @@
         "value": 4,
         "fraction": false,
         "editable": true,
-        "order": 380
+        "order": 390
       },
       "sound": {
         "type": "bool",
         "text": "Wave sounds 海浪聲",
         "value": false,
-        "order": 400
+        "order": 410
       },
       "volume": {
         "type": "slider",
@@ -264,13 +270,13 @@
         "value": 60,
         "fraction": false,
         "editable": true,
-        "order": 410
+        "order": 420
       },
       "quality": {
         "type": "combo",
         "text": "Quality 畫質",
         "value": "0",
-        "order": 430,
+        "order": 440,
         "options": [
           {
             "label": "High (native resolution) 高（原生解析度）",
@@ -290,13 +296,13 @@
         "type": "bool",
         "text": "Save power when idle 閒置時省電",
         "value": true,
-        "order": 440
+        "order": 450
       },
       "fps30": {
         "type": "bool",
         "text": "Limit to 30 FPS 鎖定 30 FPS",
         "value": false,
-        "order": 450
+        "order": 460
       }
     }
   }

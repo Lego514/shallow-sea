@@ -149,6 +149,12 @@
     "text": "Dolphins 海豚",
     "help": "Every few minutes a pod passes through the deep water, coming up to breathe and now and then leaping clear of it. 每隔幾分鐘有一群海豚從深水區游過，會浮上水面換氣，偶爾躍出水面"
   },
+  "sharks": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Reef sharks 礁鯊",
+    "help": "Now and then a blacktip reef shark, sometimes two, patrols the reef edge; the fish keep well clear of it. 偶爾有一隻（有時兩隻）黑鰭礁鯊沿著珊瑚礁邊緣巡游，魚會遠遠避開"
+  },
   "beachLife": {
     "type": "checkbox",
     "value": true,
