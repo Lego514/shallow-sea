@@ -7,6 +7,19 @@ python tools/build.py          # writes shallow-sea/sea.js
 python tools/build.py --check  # what CI runs: fails if sea.js is not what src/ builds
 ```
 
+## The render test
+
+`tools/render_test.py` opens the wallpaper in headless Chromium with software WebGL (SwiftShader) and plays four fixed scenes: noon with a splash, sunset on another shore, night with glowing jellies, and dolphins with a shark. The seabed, the hour, the random numbers and the clock are all pinned, so each scene draws the same pixels on any computer, Windows or Linux. The test fails if a shader doesn't compile, the page logs an error or a WebGL warning, or a scene's last frame differs from its reference picture in `tests/render/`. CI runs it before publishing the web version, and a failed run keeps what it drew, with a difference picture, as the `render-test` artifact.
+
+```bash
+pip install playwright==1.63.0
+python -m playwright install chromium
+python tools/render_test.py            # compare with the references
+python tools/render_test.py --update   # after a change that is meant to look different: new references
+```
+
+Commit the new references with the change that needed them. A visual change that the references don't show yet fails CI, and the web version isn't published.
+
 ## How a frame is made
 
 1. **Simulate** (`loop.js`, `creatures/`, `input.js`): creatures move, the mouse and rain drop impulses into the ripple simulation, waves and the tide advance.

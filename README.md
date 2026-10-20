@@ -23,7 +23,7 @@ An interactive tropical shore seen from above. Waves come in sets and wash up th
 - **Waves on the GPU**: interactive ripples solve the shallow-water wave equation, d²h/dt² = ∇·(c²∇h), with c² = (g/k)·tanh(kh) from the depth, so ripples slow, bunch up and bend toward the shore. The wind waves feel the bottom too: in the shallows each one follows ω² = gk·tanh(kh), keeps its wavenumber along the coast (Snell's law, Bouguer's on the curved coast) and swings round to face the beach, its phase integrated inward from deep water. Surf follows √(gh) wave speed, breaks according to wave height, and turns parallel to the beach as Snell's law predicts.
 - **Procedural world**: every seabed, coral reef and coral garden is generated from a seed; 15+ species are drawn as animated signed-distance shapes with their own behaviour (boids schooling, breathing turtles, leaping dolphins, patrolling sharks, fish fleeing predators).
 - **Performance work**: the first start after an update went from about 42 s to about 2.3 s by splitting one huge seabed shader into six small single-output passes and the creature shader into four programs, all compiled in parallel (`KHR_parallel_shader_compile`), guided by timing every program on its own with the browser's and the driver's shader caches defeated, and after finding that ANGLE on Direct3D 11 recompiles multi-render-target programs at their first draw.
-- **Shipped**: versioned releases for Lively Wallpaper and Wallpaper Engine, a web version deployed by GitHub Actions, and English / Chinese settings generated from one schema.
+- **Tested and shipped**: before the web version is published, GitHub Actions renders four fixed scenes in headless Chromium with software WebGL, with the seed, hour, random numbers and clock all pinned, and compares them pixel by pixel with reference pictures. Versioned releases for Lively Wallpaper and Wallpaper Engine; English / Chinese settings generated from one schema.
 
 More detail in [How it works](#how-it-works), and two write-ups:
 
@@ -95,8 +95,10 @@ src/                          the source of sea.js, by subject (see src/README.m
   shaders/                    GLSL: the seabed passes, ripples, sprites (one file per group of creatures), the final image
   creatures/                  spawning and behaviour: fish, rays, turtles, jellies, dolphins, sharks, hatchlings
 tools/build.py                joins src/ into shallow-sea/sea.js; `--check` fails if sea.js is out of date
+tools/render_test.py          renders four fixed scenes and compares them with tests/render/ (see src/README.md)
+tests/render/                 the render test's reference pictures
 docs/                         the screenshots in this README, and the write-ups
-.github/workflows/pages.yml   checks the build and publishes the web version to GitHub Pages on every push to main
+.github/workflows/pages.yml   on every push to main: checks the build, runs the render test, then publishes the web version to GitHub Pages
 ```
 
 To package the wallpaper yourself, zip `index.html`, `sea.js`, `LivelyInfo.json`, `LivelyProperties.json`, `thumbnail.jpg`, `preview.jpg` and `preview.gif` from `shallow-sea/` with the files at the top level of the zip.
@@ -137,7 +139,7 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 
 從正上方看下去的一段熱帶海岸：浪一組一組沖上沙灘，海水從清澈的淺水、珊瑚礁、土耳其藍漸層到深藍色；魚群、魟魚、海龜（綠蠵龜、玳瑁、欖蠵龜）和水母在裡面游，偶爾還有一群海豚經過（有時會躍出水面），或一隻黑鰭礁鯊沿著珊瑚礁巡游。全部用 WebGL2 即時運算，可以當 Windows 上 [Lively Wallpaper](https://github.com/rocksdanister/lively) 或 Wallpaper Engine 的桌布，也可以直接在瀏覽器（含手機）玩。
 
-**技術重點**：沒有用任何引擎或函式庫，約 4,000 行手寫的 JavaScript 與 GLSL 直接用 WebGL2，原始碼依主題放在 [`src/`](src/README.md)，再合併成一支程式。水的光學照物理算（Snell 折射、以折射映射 Jacobian 行列式計算的焦散、Beer–Lambert 分色吸收、Fresnel 反射、水面微面元反光）；漣漪在 GPU 上解淺水波方程，波速隨水深變化（c = √(gh)）；海床、珊瑚礁和十幾種生物全部程序化生成。遠方的風浪也會感受水深：在淺水變慢、變短、變高，並轉向與海岸平行。逐一量測每個著色器的編譯時間找出瓶頸，把一個巨大的海床著色器拆成六段、生物著色器拆成四個，全部平行編譯後，更新後第一次啟動從約 42 秒縮短到約 2.3 秒。
+**技術重點**：沒有用任何引擎或函式庫，約 4,000 行手寫的 JavaScript 與 GLSL 直接用 WebGL2，原始碼依主題放在 [`src/`](src/README.md)，再合併成一支程式。水的光學照物理算（Snell 折射、以折射映射 Jacobian 行列式計算的焦散、Beer–Lambert 分色吸收、Fresnel 反射、水面微面元反光）；漣漪在 GPU 上解淺水波方程，波速隨水深變化（c = √(gh)）；海床、珊瑚礁和十幾種生物全部程序化生成。遠方的風浪也會感受水深：在淺水變慢、變短、變高，並轉向與海岸平行。逐一量測每個著色器的編譯時間找出瓶頸，把一個巨大的海床著色器拆成六段、生物著色器拆成四個，全部平行編譯後，更新後第一次啟動從約 42 秒縮短到約 2.3 秒。每次推送時，GitHub Actions 會先用無頭 Chromium 和軟體 WebGL 畫出四個固定的場景（海床、時間、隨機數和時鐘全部固定），逐像素和參考圖比對，通過了才發布網頁版。
 
 **技術文章**：
 

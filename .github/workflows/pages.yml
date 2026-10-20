@@ -16,15 +16,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # nothing is published unless sea.js is built from src/ and four fixed scenes still render as they should
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check that sea.js is built from src/
+        run: python3 tools/build.py --check
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Playwright and headless Chromium
+        run: |
+          pip install playwright==1.63.0
+          python -m playwright install --with-deps --only-shell chromium
+      - name: Render the test scenes
+        run: python tools/render_test.py
+      - name: Keep what the failed scenes drew
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-test
+          path: tests/render/out/
+          if-no-files-found: ignore
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Check that sea.js is built from src/
-        run: python3 tools/build.py --check
       - name: Assemble the site
         run: |
           mkdir -p site

@@ -3,3 +3,7 @@
 
 # the packaged wallpaper is attached to GitHub Releases instead
 dist/
+
+# what a failed render test drew (tools/render_test.py)
+tests/render/out/
+__pycache__/
