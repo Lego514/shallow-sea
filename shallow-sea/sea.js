@@ -266,9 +266,9 @@ layout(location = 0) in vec2 a_pos;
 out vec2 v_uv;
 void main() { v_uv = a_pos * 0.5 + 0.5; gl_Position = vec4(a_pos, 0.0, 1.0); }`;
 
-// ---- seabed (rendered once per resize / regenerate), in five passes. As one shader it took Direct3D's shader
+// ---- seabed (rendered once per resize / regenerate), in six passes. As one shader it took Direct3D's shader
 // compiler (under ANGLE, on Windows) half a minute or more to build on a cold start, since its cost grows much
-// faster than the code does; as five small programs built side by side it takes a few seconds. They hand on what
+// faster than the code does; as six small programs built side by side it takes a few seconds. They hand on what
 // they have worked out so far in float32 textures, so the seabed comes out just as one pass drew it, and the last
 // two write it into floorT: rgb = albedo, a = water depth.
 const FLOOR_LIB = /* glsl */`#version 300 es
@@ -449,45 +449,17 @@ void main() {
   o = u_out == 0 ? vec4(col, rock) : vec4(prev.a, rockH, 0.0, 0.0);
 }`;
 
-// 4. coral reefs, and the water depth: shallower over the rocks and corals
-const FLOOR_CORAL_FS = /* glsl */`${FLOOR_LIB}
+// 4. coral reefs: a bed of rubble crowded with colonies. Also drawn twice: 0 the colour and how much rocks or corals
+// cover, 1 the baked light handed on and the height of rocks or corals. Split from the coral gardens because one
+// program with both was the slowest of all to compile
+const FLOOR_REEF_FS = /* glsl */`${FLOOR_LIB}
 uniform sampler2D u_prev;   // rgb colour, a = rock cover
 uniform sampler2D u_aux;    // r = the baked light, g = rock height
 uniform float u_coral;
 uniform int u_out;
-out vec4 o;                 // 0: rgb colour, a = how much of it rocks or corals cover; 1: a = the water depth
+out vec4 o;
 // where the reefs grow: a cheap two-octave field (it is looked up for every nearby coral cell)
 float reefField(vec2 p) { return 0.65 * gnoise(p * 1.1 + u_s1 * 1.7 + 4.0) + 0.3 * gnoise(p * 2.6 - u_s3 * 1.3); }
-
-// a branching coral colony seen from above, in units of its radius: n0 branches fork in two at each of lv levels,
-// out to an outline that swells and dips around it; spread 2 folds them into a half-round fan. Returns the distance
-// to the nearest branch; t is how far out along it, lat the offset across it (in half-widths), dir its heading
-float coralBranches(vec2 q, float n0, float lv, float w0, float w1, float spread, float sd,
-                    out float t, out float lat, out vec2 dir) {
-  float r = length(q), th = atan(q.y, q.x) * spread;
-  float k = min(floor(r * lv), lv - 1.0), nk = n0 * exp2(k);
-  float u = (th + 3.14159265) / 6.2831853 * nk, j0 = floor(u);
-  float best = 9.0;
-  t = 0.0; lat = 0.0; dir = vec2(1.0, 0.0);
-  for (int c = 0; c < 2; c++) {                       // the branch in this sector and the nearer neighbour
-    float j = j0 + (c == 0 ? 0.0 : fract(u) < 0.5 ? -1.0 : 1.0);
-    j = spread > 1.5 ? clamp(j, 0.0, nk - 1.0) : mod(j, nk);
-    float ang = (j + 0.5 + 0.7 * (hash21(vec2(j, k) + sd) - 0.5)) * 6.2831853 / nk - 3.14159265;
-    if (k > 0.5) {                                    // it forks off its parent's line early in this level
-      float pj = floor(j * 0.5);
-      float pang = (pj + 0.5 + 0.7 * (hash21(vec2(pj, k - 1.0) + sd) - 0.5)) * 12.566371 / nk - 3.14159265;
-      ang = mix(pang, ang, smoothstep(k / lv, (k + 0.7) / lv, r));
-    }
-    ang += 0.17 * sin(r * 7.0 + ang * 3.0 + sd);
-    float rm = 0.74 + 0.15 * sin(ang * 3.0 + sd) + 0.11 * sin(ang * 5.0 - sd * 1.7);
-    float da = th - ang;
-    if (spread < 1.5) da = mod(da + 3.14159265, 6.2831853) - 3.14159265;
-    float l = r * da / spread, w = mix(w0, w1, min(r, 1.0));
-    float dd = length(vec2(l, max(r - rm, 0.0))) - w;   // rounded growing tips
-    if (dd < best) { best = dd; t = min(r / rm, 1.0); lat = l / w; ang /= spread; dir = vec2(cos(ang), sin(ang)); }
-  }
-  return best;
-}
 
 void main() {
   vec2 p = vec2(v_uv.x * u_aspect, v_uv.y);
@@ -499,8 +471,8 @@ void main() {
   float s;
   float D = depthAt(p, s);
 
+  float coral = 0.0, coralH = 0.0;
   // coral reefs: in patches at the clear middle depths a bed of coral rubble, crowded with colonies of every shape
-  float coral = 0.0, coralH = 0.0, bigTop = 0.0;
   if (u_coral > 0.5) {
     float depthOK = smoothstep(0.2, 0.34, D) * smoothstep(1.7, 1.2, D);
     float reefZ = smoothstep(-0.05, 0.3, reefField(p)) * depthOK;
@@ -583,7 +555,59 @@ void main() {
       coral = max(coral, a);
       coralH = max(coralH, hgt * min(r / 0.03, 1.0) * a);
     }
+  }
+  o = u_out == 0 ? vec4(col, max(prev.a, coral)) : vec4(lam, max(aux.g, coralH * 0.9), 0.0, 0.0);
+}`;
 
+// 4b. now and then a coral garden out in the deeper water, and the water depth: shallower over the rocks and corals,
+// and close to the surface over a garden's mound. Drawn twice: 0 the colour and cover, 1 the depth
+const FLOOR_GARDEN_FS = /* glsl */`${FLOOR_LIB}
+uniform sampler2D u_prev;   // rgb colour, a = rock or coral cover
+uniform sampler2D u_aux;    // r = the baked light, g = the height of rocks or corals
+uniform float u_coral;
+uniform int u_out;
+out vec4 o;
+// a branching coral colony seen from above, in units of its radius: n0 branches fork in two at each of lv levels,
+// out to an outline that swells and dips around it; spread 2 folds them into a half-round fan. Returns the distance
+// to the nearest branch; t is how far out along it, lat the offset across it (in half-widths), dir its heading
+float coralBranches(vec2 q, float n0, float lv, float w0, float w1, float spread, float sd,
+                    out float t, out float lat, out vec2 dir) {
+  float r = length(q), th = atan(q.y, q.x) * spread;
+  float k = min(floor(r * lv), lv - 1.0), nk = n0 * exp2(k);
+  float u = (th + 3.14159265) / 6.2831853 * nk, j0 = floor(u);
+  float best = 9.0;
+  t = 0.0; lat = 0.0; dir = vec2(1.0, 0.0);
+  for (int c = 0; c < 2; c++) {                       // the branch in this sector and the nearer neighbour
+    float j = j0 + (c == 0 ? 0.0 : fract(u) < 0.5 ? -1.0 : 1.0);
+    j = spread > 1.5 ? clamp(j, 0.0, nk - 1.0) : mod(j, nk);
+    float ang = (j + 0.5 + 0.7 * (hash21(vec2(j, k) + sd) - 0.5)) * 6.2831853 / nk - 3.14159265;
+    if (k > 0.5) {                                    // it forks off its parent's line early in this level
+      float pj = floor(j * 0.5);
+      float pang = (pj + 0.5 + 0.7 * (hash21(vec2(pj, k - 1.0) + sd) - 0.5)) * 12.566371 / nk - 3.14159265;
+      ang = mix(pang, ang, smoothstep(k / lv, (k + 0.7) / lv, r));
+    }
+    ang += 0.17 * sin(r * 7.0 + ang * 3.0 + sd);
+    float rm = 0.74 + 0.15 * sin(ang * 3.0 + sd) + 0.11 * sin(ang * 5.0 - sd * 1.7);
+    float da = th - ang;
+    if (spread < 1.5) da = mod(da + 3.14159265, 6.2831853) - 3.14159265;
+    float l = r * da / spread, w = mix(w0, w1, min(r, 1.0));
+    float dd = length(vec2(l, max(r - rm, 0.0))) - w;   // rounded growing tips
+    if (dd < best) { best = dd; t = min(r / rm, 1.0); lat = l / w; ang /= spread; dir = vec2(cos(ang), sin(ang)); }
+  }
+  return best;
+}
+
+void main() {
+  vec2 p = vec2(v_uv.x * u_aspect, v_uv.y);
+  vec4 prev = texelFetch(u_prev, ivec2(gl_FragCoord.xy), 0), aux = texelFetch(u_aux, ivec2(gl_FragCoord.xy), 0);
+  vec3 col = prev.rgb;
+  float lam = aux.r;
+  vec3 L = normalize(LDIR);
+  vec2 sdir = -normalize(LDIR.xy);
+  float s;
+  float D = depthAt(p, s);
+  float coral = 0.0, bigTop = 0.0;
+  if (u_coral > 0.5) {
     // now and then a coral garden crowds a mound out in the deeper water: antler-branched staghorns, fine bushy
     // colonies and lacy sea fans in orange, pink, lilac and white, packed together and lifted close to the light
     {
@@ -653,7 +677,7 @@ void main() {
       }
     }
   }
-  float rockH = max(aux.g, coralH * 0.9);
+  float rockH = aux.g;
   if (u_shore.z <= 0.0) D = clamp(D - rockH * 0.16, 0.12, 1.0);
   else if (s > 0.0) D = max(D - rockH * 0.16, 0.01);
   D = mix(D, min(D, 0.16), bigTop);                // a big coral head comes up close to the surface
@@ -2081,11 +2105,11 @@ gl.getExtension('KHR_parallel_shader_compile');
 const SPRITE_GROUPS = ['G_SMALL', 'G_RAY', 'G_TURTLE', 'G_BIG'];
 const SPRITE_GROUP = [0, 0, 1, 0, 0, 1, 1, 3, 3, 2, 0, 0, 0, 3, 0, 0, 3];
 const spriteFS = g => SPRITE_FS.replace('#version 300 es\n', '#version 300 es\n#define ' + g + '\n');
-let floorHeightP, floorBaseP, floorRocksP, floorCoralP, floorDetailP, stepP, dropP, spriteP, compP, sandP, coastP;
+let floorHeightP, floorBaseP, floorRocksP, floorReefP, floorGardenP, floorDetailP, stepP, dropP, spriteP, compP, sandP, coastP;
 try {
-  [floorHeightP, floorBaseP, floorRocksP, floorCoralP, floorDetailP, stepP, dropP, ...spriteP] = [
+  [floorHeightP, floorBaseP, floorRocksP, floorReefP, floorGardenP, floorDetailP, stepP, dropP, ...spriteP] = [
     [FULLSCREEN_VS, FLOOR_HEIGHT_FS], [FULLSCREEN_VS, FLOOR_BASE_FS], [FULLSCREEN_VS, FLOOR_ROCKS_FS],
-    [FULLSCREEN_VS, FLOOR_CORAL_FS], [FULLSCREEN_VS, FLOOR_DETAIL_FS], [FULLSCREEN_VS, SIM_STEP_FS],
+    [FULLSCREEN_VS, FLOOR_REEF_FS], [FULLSCREEN_VS, FLOOR_GARDEN_FS], [FULLSCREEN_VS, FLOOR_DETAIL_FS], [FULLSCREEN_VS, SIM_STEP_FS],
     [FULLSCREEN_VS, SIM_DROP_FS], ...SPRITE_GROUPS.map(g => [SPRITE_VS, spriteFS(g)]), [FULLSCREEN_VS, COMPOSITE_FS],
     [FULLSCREEN_VS, SAND_FS], [FULLSCREEN_VS, COAST_FS],
   ].map(([vs, fs]) => startProgram(vs, fs)).map(finishProgram);
@@ -2218,6 +2242,7 @@ function renderFloor() {
   const tA = makeTarget(W, H, gl.RGBA32F, gl.RGBA, gl.FLOAT, gl.NEAREST);
   const tB = makeTarget(W, H, gl.RGBA32F, gl.RGBA, gl.FLOAT, gl.NEAREST);
   const tC = makeTarget(W, H, gl.RG32F, gl.RG, gl.FLOAT, gl.NEAREST);
+  const tD = makeTarget(W, H, gl.RG32F, gl.RG, gl.FLOAT, gl.NEAREST);
   gl.viewport(0, 0, W, H);
   gl.disable(gl.BLEND);
   const s = world.s;
@@ -2249,12 +2274,14 @@ function renderFloor() {
   pass(floorBaseP, { u_relief: tA }, tB);
   pass(floorRocksP, { u_prev: tB }, tA, 0);
   pass(floorRocksP, { u_prev: tB }, tC, 1);
-  pass(floorCoralP, { u_prev: tA, u_aux: tC }, floorT, 1);
-  pass(floorCoralP, { u_prev: tA, u_aux: tC }, tB, 0);
-  gl.colorMask(true, true, true, false);   // keep the depth the coral pass wrote
-  pass(floorDetailP, { u_prev: tB }, floorT);
+  pass(floorReefP, { u_prev: tA, u_aux: tC }, tB, 0);
+  pass(floorReefP, { u_prev: tA, u_aux: tC }, tD, 1);
+  pass(floorGardenP, { u_prev: tB, u_aux: tD }, floorT, 1);
+  pass(floorGardenP, { u_prev: tB, u_aux: tD }, tA, 0);
+  gl.colorMask(true, true, true, false);   // keep the depth the garden pass wrote
+  pass(floorDetailP, { u_prev: tA }, floorT);
   gl.colorMask(true, true, true, true);
-  for (const t of [tA, tB, tC]) freeTarget(t);
+  for (const t of [tA, tB, tC, tD]) freeTarget(t);
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, coastT.fbo);
   gl.viewport(0, 0, coastT.w, coastT.h);
