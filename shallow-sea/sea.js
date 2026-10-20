@@ -904,7 +904,9 @@ out vec4 o;
 ${NOISE}
 
 vec4 over(vec4 top, vec4 under) { return top + under * (1.0 - top.a); }
+float g_glow = -1.0;                                          // a sprite's own night glow, when it sets one
 
+#if defined(G_SMALL)
 // reef fish seen from above, head along +x, in body lengths: snout at x = 0.5, tail tips at -0.5.
 // x of v_b: 0 a little schooling fish, 1 a big fish; w of v_c says which big fish: 1 yellow tang, 2 sergeant major,
 // 3 bluefin trevally
@@ -978,6 +980,8 @@ vec4 fish(vec2 q, out float sha) {
   return col;
 }
 
+#endif
+#if defined(G_RAY)
 float sminR(float a, float b, float k) {
   float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
   return mix(b, a, h) - k * h * (1.0 - h);
@@ -1113,6 +1117,8 @@ vec4 manta(vec2 q, out float sha) {
   return vec4(col * a, a);
 }
 
+#endif
+#if defined(G_BIG)
 // moon jelly: a clear, milky bell with a fringe of fine tentacles, four lilac horseshoe gonads, radial canals and
 // four frilly oral arms showing through the middle. It pulses (y.phase)
 vec4 moonJelly(vec2 q, out float sha) {
@@ -1148,7 +1154,6 @@ vec4 moonJelly(vec2 q, out float sha) {
 // spotted lagoon jelly (Mastigias papua) from above: a plump, see-through dome, golden-olive or blue, dusted with
 // white spots that grow bigger toward the top and a softly scalloped rim. Through it show eight stubby oral arms that
 // trail a little way behind as it swims, each ending in a pale club; no long stinging tentacles. It pulses (y.phase)
-float g_glow = -1.0;                                          // a sprite's own night glow, when it sets one
 vec4 lagoonJelly(vec2 q, out float sha) {
   float ph = v_b.y, aa = fwidth(q.x) + v_blur, seed = v_c.w * 6.2831853;
   float pulse = 0.5 + 0.5 * sin(ph);                          // 1 relaxed, 0 contracted
@@ -1197,6 +1202,8 @@ vec4 lagoonJelly(vec2 q, out float sha) {
   return c;
 }
 
+#endif
+#if defined(G_SMALL)
 vec4 flower(vec2 q, out float sha) {
   float aa = fwidth(q.x) + v_blur;
   vec4 col = vec4(0.0);
@@ -1238,6 +1245,8 @@ vec4 leaf(vec2 q, out float sha) {
 // sea turtles seen from above, in body lengths: the carapace runs from x = -0.46 to 0.42, the head to about 0.68.
 // z.bend picks the species: 0 green, 1 hawksbill, 2 olive ridley.
 // Carapace outline: sh = (half width, how far forward the widest point sits, bluntness)
+#endif
+#if defined(G_TURTLE)
 float turtleShellW(float x, vec3 sh) {
   float t = clamp((x + 0.46) / 0.88, 0.0, 1.0);
   return sh.x * pow(max(sin(3.14159265 * pow(t, sh.y)), 0.0), sh.z);
@@ -1370,6 +1379,8 @@ vec4 turtle(vec2 q, out float sha) {
 }
 
 // hermit crab: a borrowed spiral shell, red legs and claws that vanish when it hides
+#endif
+#if defined(G_SMALL)
 vec4 hermitCrab(vec2 q, out float sha) {
   float ph = v_b.y, hide = v_b.z, aa = fwidth(q.x) + v_blur;
   vec2 sq = q + vec2(0.08, 0.0);
@@ -1408,6 +1419,8 @@ vec4 pellet(vec2 q, out float sha) {
   return vec4(c * a, a);
 }
 
+#endif
+#if defined(G_BIG)
 // blacktip reef shark seen from above, in body lengths: snout at x = 0.5, tail tip at x = -0.5. A slim torpedo
 // in warm grey with a rounded snout, broad sickle-shaped pectoral fins, and black tips on its fins; it swims by
 // sweeping its body from side to side, the sweep growing toward the tail (y.phase), and curves into turns (z.bend)
@@ -1445,7 +1458,7 @@ vec4 shark(vec2 q, out float sha) {
   float d = sminK(sminK(dBody, dPec, 0.012), min(dPel, dCaud), 0.008);
   float a = smoothstep(aa, -aa, d);
   float trunk = smoothstep(aa, -aa, dBody);
-  vec3 back = v_c.rgb, flank = back * 1.22 + vec3(0.03, 0.03, 0.025);
+  vec3 back = v_c.rgb, flank = back * 1.35 + vec3(0.04, 0.04, 0.035);
   float wx = max(sharkW(clamp(q.x, -0.37, 0.45)), 0.012);
   float yw = clamp(q.y / wx, -1.0, 1.0), nz = sqrt(max(1.0 - yw * yw, 0.0));
   vec3 c = mix(back, flank, smoothstep(0.45, 0.95, abs(yw)) * trunk);
@@ -1552,6 +1565,8 @@ vec4 dolphin(vec2 q, out float sha) {
   return vec4(c * a, a);
 }
 
+#endif
+#if defined(G_SMALL)
 // whitewater where a dolphin leaves the water or crashes back in: a churned patch that breaks into a web of foam,
 // a ring pushed outward, and droplets thrown clear in the first moments. y.phase = age 0..1, rgb = seed, strength
 vec4 spray(vec2 q, out float sha) {
@@ -1629,25 +1644,32 @@ vec4 gull(vec2 q, out float sha) {
   return vec4(0.0);
 }
 
+#endif
 void main() {
-  float sp = v_b.x, sha;
-  vec4 c;
+  // each program holds one group of species (see SPRITE_GROUP), so it only tells those apart
+  float sp = v_b.x, sha = 0.0;
+  vec4 c = vec4(0.0);
+#if defined(G_SMALL)
   if (sp < 1.5) c = fish(v_q, sha);
-  else if (sp < 2.5) c = stingray(v_q, sha);
   else if (sp < 3.5) c = flower(v_q, sha);
   else if (sp < 4.5) c = leaf(v_q, sha);
-  else if (sp < 5.5) c = eagleRay(v_q, sha);
-  else if (sp < 6.5) c = manta(v_q, sha);
-  else if (sp < 7.5) c = moonJelly(v_q, sha);
-  else if (sp < 8.5) c = lagoonJelly(v_q, sha);
-  else if (sp < 9.5) c = turtle(v_q, sha);
   else if (sp < 10.5) c = hermitCrab(v_q, sha);
   else if (sp < 11.5) c = gull(v_q, sha);
   else if (sp < 12.5) c = pellet(v_q, sha);
-  else if (sp < 13.5) c = dolphin(v_q, sha);
   else if (sp < 14.5) c = spray(v_q, sha);
-  else if (sp < 15.5) c = hatchling(v_q, sha);
+  else c = hatchling(v_q, sha);
+#elif defined(G_RAY)
+  if (sp < 2.5) c = stingray(v_q, sha);
+  else if (sp < 5.5) c = eagleRay(v_q, sha);
+  else c = manta(v_q, sha);
+#elif defined(G_TURTLE)
+  c = turtle(v_q, sha);
+#else
+  if (sp < 7.5) c = moonJelly(v_q, sha);
+  else if (sp < 8.5) c = lagoonJelly(v_q, sha);
+  else if (sp < 13.5) c = dolphin(v_q, sha);
   else c = shark(v_q, sha);
+#endif
   if (u_shadow == 1) o = vec4(sha, 0.0, 0.0, sha);
   else if (u_shadow == 2) o = vec4(0.0, sp > 6.5 && sp < 8.5 ? (g_glow >= 0.0 ? g_glow : min(c.a * 1.8, 1.0)) : 0.0, 0.0, 0.0);   // jellyfish glow
   else o = c;
@@ -1667,6 +1689,8 @@ uniform vec2 u_simTexel;
 uniform float u_simScale, u_simHScale;
 uniform vec4 u_wave[NW];
 uniform float u_waveAmp;
+uniform sampler2D u_wphase;   // per wave: the phase gathered crossing the shallows (see buildWavePhase)
+uniform vec4 u_wcoast;        // the direction from the coast's centre to the screen's, and the span of angles shown
 uniform vec2 u_sunShift;
 uniform float u_pathK;
 uniform vec3 u_sunDir, u_sunCol, u_ambCol, u_skyCol, u_deepCol, u_sigma, u_bioCol, u_glintH;
@@ -1680,14 +1704,70 @@ const float CR = 0.25;   // 1 - 1/n for water: how far a surface slope bends a n
 
 vec2 toUV(vec2 p) { return vec2(p.x / u_aspect, p.y); }
 
+// Wind waves feeling the bottom. Out in deep water each one is a plane wave. Within WAVE_S1 of the shore it keeps its
+// frequency but its wavenumber follows ω² = g·k·tanh(k·h) (Eckart's form): it slows down and shortens as the water
+// shoals. Its wavenumber along the coast is kept (Snell's law; around the round coast, k_t·r is kept), so the rest
+// turns across the shore and the crests swing round to face the beach. Its phase is the deep-water phase where it
+// crossed into the shallows plus ∫ k_n ds from there in, which is tabulated per wave, and it grows taller as it
+// slows (shoaling, from its group speed)
+const float WAVE_G = 6.1, WAVE_S1 = 1.0, WAVE_HS = 0.05;
+float waveDepth(float s) { return max((s * 1.1 + max(s - 0.28, 0.0) * 1.5 + max(s - 0.75, 0.0) * 0.9) * WAVE_HS, 0.002); }
+struct Coast { bool on; vec2 n, t, q; float r, s, h, u, v; };
+Coast coastAt(vec2 p) {
+  Coast c;
+  vec2 d = p - u_shore.xy;
+  c.r = length(d);
+  c.s = c.r - u_shore.z;
+  c.on = u_shore.z > 0.0 && c.s < WAVE_S1;
+  c.n = d / max(c.r, 1e-5);
+  c.t = vec2(-c.n.y, c.n.x);
+  c.q = u_shore.xy + c.n * (u_shore.z + WAVE_S1);       // where the wave crossed into the shallows
+  float sc = clamp(c.s, 0.0, WAVE_S1);
+  c.h = waveDepth(sc);
+  c.u = sqrt(sc / WAVE_S1);                                // the table is denser near the shore
+  float th = atan(u_wcoast.x * d.y - u_wcoast.y * d.x, dot(u_wcoast.xy, d));
+  c.v = clamp((th - u_wcoast.z) / (u_wcoast.w - u_wcoast.z), 0.0, 1.0);
+  return c;
+}
+// wave i here: its phase, its local wavenumber vector and its height
+void waveHere(int i, vec2 p, Coast c, out float ph, out vec2 k, out float amp) {
+  vec4 w = u_wave[i];
+  ph = dot(w.xy, p) + w.w; k = w.xy; amp = w.z;
+  if (!c.on) return;
+  float k0 = length(w.xy), om2 = WAVE_G * k0;
+  float kl = min(om2 / (WAVE_G * sqrt(tanh(om2 * c.h / WAVE_G))), 3.0 * k0);
+  float kt = dot(w.xy, c.t) * (u_shore.z + WAVE_S1) / max(c.r, 1e-4);
+  float sg = dot(w.xy, c.n) >= 0.0 ? 1.0 : -1.0;
+  float kn = sg * sqrt(max(kl * kl - kt * kt, 0.0));
+  // a wave coming in too steeply along the coast turns back before it reaches the shallowest water (a turning
+  // point): past it, it dies away instead of running on along the shore
+  float kn0 = max(k0 * k0 - dot(w.xy, c.t) * dot(w.xy, c.t), 0.02 * k0 * k0);
+  amp *= smoothstep(0.0, 0.4, (kl * kl - kt * kt) / kn0);
+  const float NS = 64.0, NT = 32.0;
+  float I = texture(u_wphase, vec2((c.u * (NS - 1.0) + 0.5) / NS, (float(i) * NT + c.v * (NT - 1.0) + 0.5) / (NT * float(NW)))).r;
+  ph = dot(w.xy, c.q) + w.w - sg * I;
+  k = kt * c.t + kn * c.n;
+  float x = min(2.0 * kl * c.h, 20.0), nG = 0.5 * (1.0 + x / sinh(max(x, 1e-4)));
+  amp *= min(sqrt(0.5 * kl / (nG * k0)), 1.8);
+}
+// worked out once per pixel: each wave's local wavenumber, its phase here and its height. The few lookups a little
+// way off (where the sunlight that lands here came through the surface) treat it as a plane wave from here
+vec4 g_wave[NW];
+vec2 g_p0;
+void prepareWaves(vec2 p) {
+  Coast c = coastAt(p);
+  g_p0 = p;
+  for (int i = 0; i < NW; i++) { float ph, a; vec2 k; waveHere(i, p, c, ph, k, a); g_wave[i] = vec4(k, ph, a); }
+}
 vec2 ambGrad(vec2 p) {
-  vec2 g = vec2(0.0);
-  for (int i = 0; i < NW; i++) { vec4 w = u_wave[i]; g += w.z * cos(dot(w.xy, p) + w.w) * w.xy; }
+  vec2 g = vec2(0.0), d = p - g_p0;
+  for (int i = 0; i < NW; i++) { vec4 w = g_wave[i]; g += w.w * cos(w.z + dot(w.xy, d)) * w.xy; }
   return g * u_waveAmp;
 }
 vec3 ambHess(vec2 p) {
   vec3 H = vec3(0.0);
-  for (int i = 0; i < NW; i++) { vec4 w = u_wave[i]; H -= w.z * sin(dot(w.xy, p) + w.w) * vec3(w.x * w.x, w.y * w.y, w.x * w.y); }
+  vec2 d = p - g_p0;
+  for (int i = 0; i < NW; i++) { vec4 w = g_wave[i]; H -= w.w * sin(w.z + dot(w.xy, d)) * vec3(w.x * w.x, w.y * w.y, w.x * w.y); }
   return H * u_waveAmp;
 }
 float sh(vec2 uv) { return texture(u_sim, uv).r; }
@@ -1754,6 +1834,7 @@ void main() {
   float Dw = mix(max(D0, 0.0), max(s - edge, 0.0) * 0.08, onBeach) * cover;
 
   vec2 gS = simGrad(uv) * cover;
+  prepareWaves(p);
   vec2 g = ambGrad(p) * smoothstep(0.0, 0.05, Dw) + gS;
 
   // swells, bores and running sheets bend the light; broken water and thin sheets are choppy
@@ -1995,14 +2076,20 @@ const rgba8 = (w, h) => makeTarget(w, h, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE);
 const rgba16f = (w, h) => makeTarget(w, h, gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT);
 
 gl.getExtension('KHR_parallel_shader_compile');
+// species → which sprite program draws it. One program for every species took the longest of all to compile;
+// four smaller ones compile side by side
+const SPRITE_GROUPS = ['G_SMALL', 'G_RAY', 'G_TURTLE', 'G_BIG'];
+const SPRITE_GROUP = [0, 0, 1, 0, 0, 1, 1, 3, 3, 2, 0, 0, 0, 3, 0, 0, 3];
+const spriteFS = g => SPRITE_FS.replace('#version 300 es\n', '#version 300 es\n#define ' + g + '\n');
 let floorHeightP, floorBaseP, floorRocksP, floorCoralP, floorDetailP, stepP, dropP, spriteP, compP, sandP, coastP;
 try {
-  [floorHeightP, floorBaseP, floorRocksP, floorCoralP, floorDetailP, stepP, dropP, spriteP, compP, sandP, coastP] = [
+  [floorHeightP, floorBaseP, floorRocksP, floorCoralP, floorDetailP, stepP, dropP, ...spriteP] = [
     [FULLSCREEN_VS, FLOOR_HEIGHT_FS], [FULLSCREEN_VS, FLOOR_BASE_FS], [FULLSCREEN_VS, FLOOR_ROCKS_FS],
     [FULLSCREEN_VS, FLOOR_CORAL_FS], [FULLSCREEN_VS, FLOOR_DETAIL_FS], [FULLSCREEN_VS, SIM_STEP_FS],
-    [FULLSCREEN_VS, SIM_DROP_FS], [SPRITE_VS, SPRITE_FS], [FULLSCREEN_VS, COMPOSITE_FS],
+    [FULLSCREEN_VS, SIM_DROP_FS], ...SPRITE_GROUPS.map(g => [SPRITE_VS, spriteFS(g)]), [FULLSCREEN_VS, COMPOSITE_FS],
     [FULLSCREEN_VS, SAND_FS], [FULLSCREEN_VS, COAST_FS],
   ].map(([vs, fs]) => startProgram(vs, fs)).map(finishProgram);
+  [compP, sandP, coastP] = spriteP.splice(SPRITE_GROUPS.length);
 } catch (e) {
   fail('A shader failed to compile: ' + e.message + '\n著色器編譯失敗。');
   return;
@@ -2177,8 +2264,60 @@ function renderFloor() {
   gl.uniform2f(coastP.u.u_s3, s[6], s[7]);
   gl.uniform3fv(coastP.u.u_shore, shoreParams());
   drawTri();
+  buildWavePhase();
   readDepthMap();
   relocateCreatures();
+}
+
+// the wind waves' phase across the shallows (see waveHere in the composite shader): for each wave, against the
+// distance from the shore (denser near it) and the angle around the coast's centre, ∫ k_n ds from the outer edge of
+// the shallows in. Must follow the shader's waveDepth and dispersion exactly
+const WAVE_G = 6.1, WAVE_S1 = 1.0, WAVE_HS = 0.05, WP_NS = 64, WP_NT = 32;
+const waveDepth = s => Math.max((s * 1.1 + Math.max(s - 0.28, 0) * 1.5 + Math.max(s - 0.75, 0) * 0.9) * WAVE_HS, 0.002);
+let wavePhaseT = null, waveCoast = [1, 0, 0, 1];
+function buildWavePhase() {
+  if (!wavePhaseT) {
+    wavePhaseT = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, wavePhaseT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  }
+  const data = new Float32Array(WP_NS * WP_NT * NW);
+  const [cx, cy, R] = shoreParams();
+  if (R > 0) {
+    const rx = 0.5 * aspect - cx, ry = 0.5 - cy, rl = Math.hypot(rx, ry), ex = rx / rl, ey = ry / rl;
+    let t0 = Infinity, t1 = -Infinity;
+    for (const fx of [0, 0.5, 1]) for (const fy of [0, 0.5, 1]) {
+      const dx = fx * aspect - cx, dy = fy - cy, t = Math.atan2(ex * dy - ey * dx, ex * dx + ey * dy);
+      t0 = Math.min(t0, t); t1 = Math.max(t1, t);
+    }
+    const pad = (t1 - t0) * 0.05 + 1e-4;
+    t0 -= pad; t1 += pad;
+    waveCoast = [ex, ey, t0, t1];
+    const r1 = R + WAVE_S1, sAt = m => WAVE_S1 * (m / (WP_NS - 1)) ** 2;
+    world.waves.forEach((w, i) => {
+      const om2 = WAVE_G * w.k;
+      for (let j = 0; j < WP_NT; j++) {
+        const t = t0 + (t1 - t0) * j / (WP_NT - 1), c = Math.cos(t), sn = Math.sin(t);
+        const nx = ex * c - ey * sn, ny = ex * sn + ey * c, kt1 = -w.kx * ny + w.ky * nx;
+        const row = (i * WP_NT + j) * WP_NS;
+        let acc = 0;
+        for (let m = WP_NS - 1; m > 0; m--) {
+          const sa = sAt(m), sb = sAt(m - 1);
+          for (let q = 0; q < 6; q++) {
+            const sm = sa + (sb - sa) * (q + 0.5) / 6, h = waveDepth(sm);
+            const kl = Math.min(om2 / (WAVE_G * Math.sqrt(Math.tanh(om2 * h / WAVE_G))), 3 * w.k), kt = kt1 * r1 / (R + sm);
+            acc += Math.sqrt(Math.max(kl * kl - kt * kt, 0)) * (sa - sb) / 6;
+          }
+          data[row + m - 1] = acc;
+        }
+      }
+    });
+  }
+  gl.bindTexture(gl.TEXTURE_2D, wavePhaseT);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.R16F, WP_NS, WP_NT * NW, 0, gl.RED, gl.FLOAT, data);
 }
 
 // where the beach is: centre and radius of the coastline circle (a huge circle is a straight beach)
@@ -3062,7 +3201,7 @@ function spawnSharks() {
     sharks.push({ x: sx - Math.cos(ang) * back, y: sy - Math.sin(ang) * back, ang, tx: ex, ty: ey,
                   vx: Math.cos(ang) * 0.07, vy: Math.sin(ang) * 0.07, angVel: 0, bend: 0, len: rand(0.15, 0.19),
                   phase: rand(0, TAU), beat: rand(0.75, 0.95), depth: rand(0.18, 0.26), wander: rand(0, TAU),
-                  shy: 0, col: [0.30 + g, 0.29 + g, 0.26 + g] });
+                  shy: 0, col: [0.21 + g, 0.205 + g, 0.19 + g] });
   }
   sharkAge = 0;
 }
@@ -3334,6 +3473,12 @@ function packInstances() {
   skyBatch.count = n;
 
   for (const b of [deepBatch, fishBatch, floatBatch, skyBatch]) {
+    b.runs = [];
+    for (let i = 0; i < b.count; i++) {
+      const g = SPRITE_GROUP[b.data[i * 12 + 4] | 0] ?? 0, last = b.runs[b.runs.length - 1];
+      if (last && last[2] === g) last[1]++;
+      else b.runs.push([i, 1, g]);
+    }
     if (!b.count) continue;
     gl.bindBuffer(gl.ARRAY_BUFFER, b.buf);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, b.data, 0, b.count * 12);
@@ -3409,17 +3554,32 @@ function updateSand(dt) {
 // sim heights → world slopes; tuned so a click makes a bright caustic ring
 const SIM_AMP = 0.0035;
 
+// draw a batch run by run, each with its own program, pointing the instance attributes at the run's first instance
+function drawBatch(b, shadow, only) {
+  gl.bindVertexArray(b.vao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, b.buf);
+  for (const [start, count, g] of b.runs) {
+    if (only !== undefined && g !== only) continue;
+    gl.useProgram(spriteP[g].p);
+    gl.uniform1i(spriteP[g].u.u_shadow, shadow);
+    for (let i = 0; i < 3; i++) gl.vertexAttribPointer(1 + i, 4, gl.FLOAT, false, 48, start * 48 + i * 16);
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, count);
+  }
+}
+
 function renderSprites(L) {
-  gl.useProgram(spriteP.p);
-  const u = spriteP.u;
   bindTex(0, floorT.tex);
   bindTex(1, simA.tex);
-  gl.uniform1i(u.u_floor, 0);
-  gl.uniform1i(u.u_sim, 1);
-  gl.uniform1f(u.u_aspect, aspect);
-  gl.uniform2f(u.u_sunShift, L.sunShift[0], L.sunShift[1]);
-  gl.uniform2f(u.u_simTexel, 1 / simW, 1 / simH);
-  gl.uniform1f(u.u_simScale, SIM_AMP * simH);
+  for (const P of spriteP) {
+    const u = P.u;
+    gl.useProgram(P.p);
+    gl.uniform1i(u.u_floor, 0);
+    gl.uniform1i(u.u_sim, 1);
+    gl.uniform1f(u.u_aspect, aspect);
+    gl.uniform2f(u.u_sunShift, L.sunShift[0], L.sunShift[1]);
+    gl.uniform2f(u.u_simTexel, 1 / simW, 1 / simH);
+    gl.uniform1f(u.u_simScale, SIM_AMP * simH);
+  }
   gl.enable(gl.BLEND);
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, shadowT.fbo);
@@ -3428,31 +3588,21 @@ function renderSprites(L) {
   gl.clear(gl.COLOR_BUFFER_BIT);
   gl.blendEquation(gl.MAX);
   gl.blendFunc(gl.ONE, gl.ONE);
-  gl.uniform1i(u.u_shadow, 1);
-  for (const b of [deepBatch, fishBatch, floatBatch, skyBatch]) {
-    if (!b.count) continue;
-    gl.bindVertexArray(b.vao);
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, b.count);
-  }
+  for (const b of [deepBatch, fishBatch, floatBatch, skyBatch]) if (b.count) drawBatch(b, 1);
   if (L.bio > 0.01 && fishBatch.count) {
     // at night the jellyfish glow: their halo goes into the shadow map's green channel
     gl.colorMask(false, true, false, false);
-    gl.uniform1i(u.u_shadow, 2);
-    gl.bindVertexArray(fishBatch.vao);
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, fishBatch.count);
+    drawBatch(fishBatch, 2, SPRITE_GROUP[7]);
     gl.colorMask(true, true, true, true);
   }
 
   gl.blendEquation(gl.FUNC_ADD);
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-  gl.uniform1i(u.u_shadow, 0);
   for (const [t, b] of [[deepT, deepBatch], [fishT, fishBatch], [floatT, floatBatch]]) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
     gl.viewport(0, 0, W, H);
     gl.clear(gl.COLOR_BUFFER_BIT);
-    if (!b.count) continue;
-    gl.bindVertexArray(b.vao);
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, b.count);
+    if (b.count) drawBatch(b, 0);
   }
   gl.disable(gl.BLEND);
 }
@@ -3470,6 +3620,8 @@ function composite(L, dt) {
   bindTex(5, deepT.tex); gl.uniform1i(u.u_deep, 5);
   bindTex(6, sandA.tex); gl.uniform1i(u.u_sand, 6);
   bindTex(7, coastT.tex); gl.uniform1i(u.u_coast, 7);
+  bindTex(8, wavePhaseT); gl.uniform1i(u.u_wphase, 8);
+  gl.uniform4fv(u.u_wcoast, waveCoast);
   gl.uniform1f(u.u_aspect, aspect);
   gl.uniform3fv(u.u_shore, shoreParams());
   gl.uniform1f(u.u_swashT, time % 36000);
