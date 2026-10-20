@@ -2,11 +2,30 @@
 
 ![Shallow Sea](shallow-sea/preview.webp)
 
-An interactive tropical shore seen from above. Waves come in sets and wash up the beach, the water deepens from clear shallows over coral reefs and turquoise to deep blue, and fish, rays, sea turtles and jellyfish swim through it, with a pod of dolphins or a reef shark passing now and then. Everything is rendered live in WebGL2. It runs as a desktop wallpaper in [Lively Wallpaper](https://github.com/rocksdanister/lively) on Windows, or in any browser, phones included.
+An interactive tropical shore seen from above. Waves come in sets and wash up the beach, the water deepens from clear shallows over coral reefs and turquoise to deep blue, and fish, rays, sea turtles and jellyfish swim through it, with a pod of dolphins or a reef shark passing now and then. Everything is rendered live in WebGL2. It runs as a desktop wallpaper in [Lively Wallpaper](https://github.com/rocksdanister/lively) or Wallpaper Engine on Windows, or in any browser, phones included.
 
-**Play it in your browser: <https://lego514.github.io/shallow-sea/>** — the gear in the bottom-right corner opens the settings (English or 中文).
+**▶ Play it in your browser: <https://lego514.github.io/shallow-sea/>** — the gear in the bottom-right corner opens the settings (English or 中文).
 
 [中文說明](#中文說明)
+
+| Morning | Sunset | Night |
+| --- | --- | --- |
+| ![Morning](docs/morning.jpg) | ![Sunset](docs/sunset.jpg) | ![Night: glowing jellies and plankton, the shoreline lit up by the surf](docs/night.jpg) |
+
+| Coral garden | Sea turtle | Reef shark | Dolphin leap | Jellies at night |
+| --- | --- | --- | --- | --- |
+| ![Coral garden](docs/coral-garden.jpg) | ![Sea turtle](docs/turtle.jpg) | ![Blacktip reef shark](docs/shark.jpg) | ![Dolphin leap](docs/dolphin-leap.jpg) | ![Moon and spotted lagoon jellies at night](docs/night-jellies.jpg) |
+
+## Technical highlights
+
+- **No engine, no libraries**: one hand-written `sea.js` (about 3,800 lines of JavaScript and GLSL) on plain WebGL2.
+- **Water optics from physics**: refraction through the moving surface (Snell's law, n = 1.333); caustics whose brightness is 1 / |det J| of the refraction map, i.e. light conserved; per-channel Beer–Lambert absorption, so red goes first and the water turns turquoise, then blue; Fresnel reflection; sun and moon glitter from individual ripple facets.
+- **Waves on the GPU**: interactive ripples solve the shallow-water wave equation, d²h/dt² = ∇·(c²∇h), with c² = (g/k)·tanh(kh) from the depth, so ripples slow, bunch up and bend toward the shore. Surf follows √(gh) wave speed, breaks according to wave height, and turns parallel to the beach as Snell's law predicts.
+- **Procedural world**: every seabed, coral reef and coral garden is generated from a seed; 15+ species are drawn as animated signed-distance shapes with their own behaviour (boids schooling, breathing turtles, leaping dolphins, patrolling sharks, fish fleeing predators).
+- **Performance work**: the first start after an update went from about 42 s to 6 s by splitting one huge seabed shader into five small single-output passes that the browser compiles in parallel (`KHR_parallel_shader_compile`), after finding that ANGLE on Direct3D 11 recompiles multi-render-target programs at their first draw.
+- **Shipped**: versioned releases for Lively Wallpaper and Wallpaper Engine, a web version deployed by GitHub Actions, and English / Chinese settings generated from one schema.
+
+More detail in [How it works](#how-it-works).
 
 ## Install as a wallpaper
 
@@ -69,6 +88,7 @@ shallow-sea/
   LivelyProperties.json  Lively's Customise panel (the web settings panel reads it too)
   project.json           the same settings for Wallpaper Engine (run `python tools/make_project_json.py` after changing LivelyProperties.json)
   thumbnail.jpg / preview.jpg / preview.gif / preview.webp   pictures for Lively and this README
+docs/                         the screenshots in this README
 .github/workflows/pages.yml   publishes the web version to GitHub Pages on every push to main
 ```
 
@@ -100,7 +120,9 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 
 ## 中文說明
 
-從正上方看下去的一段熱帶海岸：浪一組一組沖上沙灘，海水從清澈的淺水、珊瑚礁、土耳其藍漸層到深藍色；魚群、魟魚、海龜（綠蠵龜、玳瑁、欖蠵龜）和水母在裡面游，偶爾還有一群海豚經過，有時會躍出水面。全部用 WebGL2 即時運算，可以當 Windows 上 [Lively Wallpaper](https://github.com/rocksdanister/lively) 的桌布，也可以直接在瀏覽器（含手機）玩。
+從正上方看下去的一段熱帶海岸：浪一組一組沖上沙灘，海水從清澈的淺水、珊瑚礁、土耳其藍漸層到深藍色；魚群、魟魚、海龜（綠蠵龜、玳瑁、欖蠵龜）和水母在裡面游，偶爾還有一群海豚經過（有時會躍出水面），或一隻黑鰭礁鯊沿著珊瑚礁巡游。全部用 WebGL2 即時運算，可以當 Windows 上 [Lively Wallpaper](https://github.com/rocksdanister/lively) 或 Wallpaper Engine 的桌布，也可以直接在瀏覽器（含手機）玩。
+
+**技術重點**：沒有用任何引擎或函式庫，一個手寫的 `sea.js`（約 3,800 行 JavaScript 與 GLSL）直接用 WebGL2。水的光學照物理算（Snell 折射、以折射映射 Jacobian 行列式計算的焦散、Beer–Lambert 分色吸收、Fresnel 反射、水面微面元反光）；漣漪在 GPU 上解淺水波方程，波速隨水深變化（c = √(gh)）；海床、珊瑚礁和十幾種生物全部程序化生成。把一個巨大的海床著色器拆成五段平行編譯後，更新後第一次啟動從約 42 秒縮短到約 6 秒。
 
 **線上玩：<https://lego514.github.io/shallow-sea/>**（右下角齒輪可以調設定、切換中文／English）
 
