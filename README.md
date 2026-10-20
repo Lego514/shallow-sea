@@ -18,14 +18,17 @@ An interactive tropical shore seen from above. Waves come in sets and wash up th
 
 ## Technical highlights
 
-- **No engine, no libraries**: one hand-written `sea.js` (about 4,000 lines of JavaScript and GLSL) on plain WebGL2.
+- **No engine, no libraries**: about 4,000 lines of hand-written JavaScript and GLSL on plain WebGL2, organised by subject in [`src/`](src/README.md) and built into one script.
 - **Water optics from physics**: refraction through the moving surface (Snell's law, n = 1.333); caustics whose brightness is 1 / |det J| of the refraction map, i.e. light conserved; per-channel Beer–Lambert absorption, so red goes first and the water turns turquoise, then blue; Fresnel reflection; sun and moon glitter from individual ripple facets.
 - **Waves on the GPU**: interactive ripples solve the shallow-water wave equation, d²h/dt² = ∇·(c²∇h), with c² = (g/k)·tanh(kh) from the depth, so ripples slow, bunch up and bend toward the shore. The wind waves feel the bottom too: in the shallows each one follows ω² = gk·tanh(kh), keeps its wavenumber along the coast (Snell's law, Bouguer's on the curved coast) and swings round to face the beach, its phase integrated inward from deep water. Surf follows √(gh) wave speed, breaks according to wave height, and turns parallel to the beach as Snell's law predicts.
 - **Procedural world**: every seabed, coral reef and coral garden is generated from a seed; 15+ species are drawn as animated signed-distance shapes with their own behaviour (boids schooling, breathing turtles, leaping dolphins, patrolling sharks, fish fleeing predators).
 - **Performance work**: the first start after an update went from about 42 s to about 2.3 s by splitting one huge seabed shader into six small single-output passes and the creature shader into four programs, all compiled in parallel (`KHR_parallel_shader_compile`), guided by timing every program on its own with the browser's and the driver's shader caches defeated, and after finding that ANGLE on Direct3D 11 recompiles multi-render-target programs at their first draw.
 - **Shipped**: versioned releases for Lively Wallpaper and Wallpaper Engine, a web version deployed by GitHub Actions, and English / Chinese settings generated from one schema.
 
-More detail in [How it works](#how-it-works).
+More detail in [How it works](#how-it-works), and two write-ups:
+
+- [From 42 seconds to 2: cold-starting a WebGL wallpaper on Windows](docs/startup-time.md): finding and removing a shader-compile bottleneck through ANGLE, FXC and the GPU driver.
+- [Caustics in a browser: light on the seabed from the Jacobian of refraction](docs/caustics.md): per-pixel caustics, absorption and refraction in one fragment shader.
 
 ## Install as a wallpaper
 
@@ -83,18 +86,30 @@ Lively itself can pause the wallpaper entirely: in Lively's **Settings → Perfo
 shallow-sea/
   index.html             entry point used by Lively
   web.html               the web version: the same scene plus a settings panel (English / 中文)
-  sea.js                 all of the simulation and shaders
+  sea.js                 all of the simulation and shaders, built from src/ (one script, so it loads straight from disk)
   LivelyInfo.json        wallpaper info for Lively
   LivelyProperties.json  Lively's Customise panel (the web settings panel reads it too)
   project.json           the same settings for Wallpaper Engine (run `python tools/make_project_json.py` after changing LivelyProperties.json)
   thumbnail.jpg / preview.jpg / preview.gif / preview.webp   pictures for Lively and this README
-docs/                         the screenshots in this README
-.github/workflows/pages.yml   publishes the web version to GitHub Pages on every push to main
+src/                          the source of sea.js, by subject (see src/README.md)
+  shaders/                    GLSL: the seabed passes, ripples, sprites (one file per group of creatures), the final image
+  creatures/                  spawning and behaviour: fish, rays, turtles, jellies, dolphins, sharks, hatchlings
+tools/build.py                joins src/ into shallow-sea/sea.js; `--check` fails if sea.js is out of date
+docs/                         the screenshots in this README, and the write-ups
+.github/workflows/pages.yml   checks the build and publishes the web version to GitHub Pages on every push to main
 ```
 
 To package the wallpaper yourself, zip `index.html`, `sea.js`, `LivelyInfo.json`, `LivelyProperties.json`, `thumbnail.jpg`, `preview.jpg` and `preview.gif` from `shallow-sea/` with the files at the top level of the zip.
 
 ## Run it locally
+
+After changing anything in `src/`, rebuild `sea.js`:
+
+```bash
+python tools/build.py
+```
+
+Then serve the folder:
 
 ```bash
 python -m http.server 8765 --directory shallow-sea
@@ -122,7 +137,12 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 
 從正上方看下去的一段熱帶海岸：浪一組一組沖上沙灘，海水從清澈的淺水、珊瑚礁、土耳其藍漸層到深藍色；魚群、魟魚、海龜（綠蠵龜、玳瑁、欖蠵龜）和水母在裡面游，偶爾還有一群海豚經過（有時會躍出水面），或一隻黑鰭礁鯊沿著珊瑚礁巡游。全部用 WebGL2 即時運算，可以當 Windows 上 [Lively Wallpaper](https://github.com/rocksdanister/lively) 或 Wallpaper Engine 的桌布，也可以直接在瀏覽器（含手機）玩。
 
-**技術重點**：沒有用任何引擎或函式庫，一個手寫的 `sea.js`（約 4,000 行 JavaScript 與 GLSL）直接用 WebGL2。水的光學照物理算（Snell 折射、以折射映射 Jacobian 行列式計算的焦散、Beer–Lambert 分色吸收、Fresnel 反射、水面微面元反光）；漣漪在 GPU 上解淺水波方程，波速隨水深變化（c = √(gh)）；海床、珊瑚礁和十幾種生物全部程序化生成。遠方的風浪也會感受水深：在淺水變慢、變短、變高，並轉向與海岸平行。逐一量測每個著色器的編譯時間找出瓶頸，把一個巨大的海床著色器拆成六段、生物著色器拆成四個，全部平行編譯後，更新後第一次啟動從約 42 秒縮短到約 2.3 秒。
+**技術重點**：沒有用任何引擎或函式庫，約 4,000 行手寫的 JavaScript 與 GLSL 直接用 WebGL2，原始碼依主題放在 [`src/`](src/README.md)，再合併成一支程式。水的光學照物理算（Snell 折射、以折射映射 Jacobian 行列式計算的焦散、Beer–Lambert 分色吸收、Fresnel 反射、水面微面元反光）；漣漪在 GPU 上解淺水波方程，波速隨水深變化（c = √(gh)）；海床、珊瑚礁和十幾種生物全部程序化生成。遠方的風浪也會感受水深：在淺水變慢、變短、變高，並轉向與海岸平行。逐一量測每個著色器的編譯時間找出瓶頸，把一個巨大的海床著色器拆成六段、生物著色器拆成四個，全部平行編譯後，更新後第一次啟動從約 42 秒縮短到約 2.3 秒。
+
+**技術文章**：
+
+- [從 42 秒到 2 秒：在 Windows 上讓 WebGL 桌布快速冷啟動](docs/startup-time.zh-TW.md)：一路追過 ANGLE、FXC 和顯示卡驅動，找出並拿掉著色器編譯的瓶頸。
+- [在瀏覽器裡畫出水底光紋：用折射的 Jacobian 算出海床上的光](docs/caustics.zh-TW.md)：在一個片段著色器裡逐像素算出焦散、吸收和折射。
 
 **線上玩：<https://lego514.github.io/shallow-sea/>**（右下角齒輪可以調設定、切換中文／English）
 

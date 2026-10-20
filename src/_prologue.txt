@@ -1,0 +1,17 @@
+// Shallow Sea (淺海) — interactive tropical-shore wallpaper (WebGL2, Lively Wallpaper compatible)
+//
+// Built by tools/build.py from the files in src/: edit those, then run `python tools/build.py`.
+//
+// Layers, bottom to top:
+//   seabed   procedural beach / sand / seagrass / rocks / pebbles / starfish, baked once into a texture
+//            (rgb = albedo, a = water depth, negative on the beach); a second baked map holds the
+//            coastline coordinate that drives the waves washing up the sand
+//   sand     what you write on the beach, smoothed away whenever a wave runs over it
+//   shadows  fish + floating flowers projected onto the seabed along the refracted sun ray
+//   fish     boids rendered as SDF sprites, seen through the refracting surface
+//   surface  analytic wind waves + a GPU height-field simulation for the ripples you make;
+//            caustics come from the Jacobian of the refraction map (1 / |det J|)
+//   floats   flowers and leaves riding on the surface
+(() => {
+'use strict';
+

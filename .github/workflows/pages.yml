@@ -23,6 +23,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - name: Check that sea.js is built from src/
+        run: python3 tools/build.py --check
       - name: Assemble the site
         run: |
           mkdir -p site

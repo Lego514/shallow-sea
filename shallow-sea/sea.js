@@ -1,5 +1,7 @@
 // Shallow Sea (淺海) — interactive tropical-shore wallpaper (WebGL2, Lively Wallpaper compatible)
 //
+// Built by tools/build.py from the files in src/: edit those, then run `python tools/build.py`.
+//
 // Layers, bottom to top:
 //   seabed   procedural beach / sand / seagrass / rocks / pebbles / starfish, baked once into a texture
 //            (rgb = albedo, a = water depth, negative on the beach); a second baked map holds the
@@ -917,7 +919,8 @@ void main() {
   gl_Position = vec4(w.x / u_aspect * 2.0 - 1.0, w.y * 2.0 - 1.0, 0.0, 1.0);
 }`;
 
-const SPRITE_FS = /* glsl */`#version 300 es
+// the fragment shader's start, shared by the four sprite programs: inputs, noise, compositing, the glow flag
+const SPRITE_HEAD = /* glsl */`#version 300 es
 precision highp float;
 precision highp int;
 in vec2 v_q;
@@ -931,7 +934,10 @@ ${NOISE}
 vec4 over(vec4 top, vec4 under) { return top + under * (1.0 - top.a); }
 float g_glow = -1.0;                                          // a sprite's own night glow, when it sets one
 
-#if defined(G_SMALL)
+`;
+
+// sprites: reef fish, small and big
+const SPRITE_FISH = /* glsl */`#if defined(G_SMALL)
 // reef fish seen from above, head along +x, in body lengths: snout at x = 0.5, tail tips at -0.5.
 // x of v_b: 0 a little schooling fish, 1 a big fish; w of v_c says which big fish: 1 yellow tang, 2 sergeant major,
 // 3 bluefin trevally
@@ -1006,7 +1012,10 @@ vec4 fish(vec2 q, out float sha) {
 }
 
 #endif
-#if defined(G_RAY)
+`;
+
+// sprites: the stingray, the eagle ray and the manta
+const SPRITE_RAYS = /* glsl */`#if defined(G_RAY)
 float sminR(float a, float b, float k) {
   float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
   return mix(b, a, h) - k * h * (1.0 - h);
@@ -1143,7 +1152,10 @@ vec4 manta(vec2 q, out float sha) {
 }
 
 #endif
-#if defined(G_BIG)
+`;
+
+// sprites: moon jellies and spotted lagoon jellies
+const SPRITE_JELLIES = /* glsl */`#if defined(G_BIG)
 // moon jelly: a clear, milky bell with a fringe of fine tentacles, four lilac horseshoe gonads, radial canals and
 // four frilly oral arms showing through the middle. It pulses (y.phase)
 vec4 moonJelly(vec2 q, out float sha) {
@@ -1228,7 +1240,10 @@ vec4 lagoonJelly(vec2 q, out float sha) {
 }
 
 #endif
-#if defined(G_SMALL)
+`;
+
+// sprites: flowers and leaves floating on the surface
+const SPRITE_FLOATS = /* glsl */`#if defined(G_SMALL)
 vec4 flower(vec2 q, out float sha) {
   float aa = fwidth(q.x) + v_blur;
   vec4 col = vec4(0.0);
@@ -1271,7 +1286,10 @@ vec4 leaf(vec2 q, out float sha) {
 // z.bend picks the species: 0 green, 1 hawksbill, 2 olive ridley.
 // Carapace outline: sh = (half width, how far forward the widest point sits, bluntness)
 #endif
-#if defined(G_TURTLE)
+`;
+
+// sprites: green, hawksbill and olive ridley turtles
+const SPRITE_TURTLE = /* glsl */`#if defined(G_TURTLE)
 float turtleShellW(float x, vec3 sh) {
   float t = clamp((x + 0.46) / 0.88, 0.0, 1.0);
   return sh.x * pow(max(sin(3.14159265 * pow(t, sh.y)), 0.0), sh.z);
@@ -1405,7 +1423,10 @@ vec4 turtle(vec2 q, out float sha) {
 
 // hermit crab: a borrowed spiral shell, red legs and claws that vanish when it hides
 #endif
-#if defined(G_SMALL)
+`;
+
+// sprites: hermit crabs and crumbs of fish food
+const SPRITE_BEACH = /* glsl */`#if defined(G_SMALL)
 vec4 hermitCrab(vec2 q, out float sha) {
   float ph = v_b.y, hide = v_b.z, aa = fwidth(q.x) + v_blur;
   vec2 sq = q + vec2(0.08, 0.0);
@@ -1445,7 +1466,10 @@ vec4 pellet(vec2 q, out float sha) {
 }
 
 #endif
-#if defined(G_BIG)
+`;
+
+// sprites: the reef shark and the bottlenose dolphin
+const SPRITE_BIG = /* glsl */`#if defined(G_BIG)
 // blacktip reef shark seen from above, in body lengths: snout at x = 0.5, tail tip at x = -0.5. A slim torpedo
 // in warm grey with a rounded snout, broad sickle-shaped pectoral fins, and black tips on its fins; it swims by
 // sweeping its body from side to side, the sweep growing toward the tail (y.phase), and curves into turns (z.bend)
@@ -1591,7 +1615,10 @@ vec4 dolphin(vec2 q, out float sha) {
 }
 
 #endif
-#if defined(G_SMALL)
+`;
+
+// sprites: whitewater from a leap, turtle hatchlings and the gull's shadow
+const SPRITE_SURFACE = /* glsl */`#if defined(G_SMALL)
 // whitewater where a dolphin leaves the water or crashes back in: a churned patch that breaks into a web of foam,
 // a ring pushed outward, and droplets thrown clear in the first moments. y.phase = age 0..1, rgb = seed, strength
 vec4 spray(vec2 q, out float sha) {
@@ -1670,7 +1697,10 @@ vec4 gull(vec2 q, out float sha) {
 }
 
 #endif
-void main() {
+`;
+
+// the fragment shader's main, then the whole fragment shader put together
+const SPRITE_MAIN = /* glsl */`void main() {
   // each program holds one group of species (see SPRITE_GROUP), so it only tells those apart
   float sp = v_b.x, sha = 0.0;
   vec4 c = vec4(0.0);
@@ -1699,6 +1729,7 @@ void main() {
   else if (u_shadow == 2) o = vec4(0.0, sp > 6.5 && sp < 8.5 ? (g_glow >= 0.0 ? g_glow : min(c.a * 1.8, 1.0)) : 0.0, 0.0, 0.0);   // jellyfish glow
   else o = c;
 }`;
+const SPRITE_FS = [SPRITE_HEAD, SPRITE_FISH, SPRITE_RAYS, SPRITE_JELLIES, SPRITE_FLOATS, SPRITE_TURTLE, SPRITE_BEACH, SPRITE_BIG, SPRITE_SURFACE, SPRITE_MAIN].join('');
 
 // ---- final image
 const COMPOSITE_FS = /* glsl */`#version 300 es
@@ -3811,6 +3842,14 @@ function showSeed() {
   seedTagTimer = setTimeout(() => { seedTag.style.opacity = '0'; }, 15000);
 }
 
+function regenerate() {
+  seed = (Math.random() * 2 ** 31) | 0;
+  makeWorld();
+  requestFloor();
+  showSeed();
+}
+
+// ---------------------------------------------------------------- the frame loop
 let stepping = false;               // test hook: the clock only moves when a frame is asked for (recording)
 let paused = false;                 // Wallpaper Engine tells us when it pauses the wallpaper
 const IDLE_AFTER = 45;              // seconds without the mouse before the wallpaper slows to 30 FPS
@@ -3866,13 +3905,6 @@ function step(dt) {
     statsEl.style.display = 'block';
     statsEl.textContent = `${fpsShown.toFixed(0)} fps · ${W}×${H} · sim ${simW}×${simH} · seed ${seed}`;
   }
-}
-
-function regenerate() {
-  seed = (Math.random() * 2 ** 31) | 0;
-  makeWorld();
-  requestFloor();
-  showSeed();
 }
 
 // ---------------------------------------------------------------- Lively Wallpaper properties
