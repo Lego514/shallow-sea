@@ -774,12 +774,21 @@ uniform float u_aspect;
 uniform float u_damp;
 uniform sampler2D u_floor;
 uniform float u_tide;
+// how fast ripples run here, as a share of their speed in deep water (squared). Water waves obey
+// c² = (g/k)·tanh(kh): in shallow water that is g·h, so c = √(gh), and it levels off once the water is deeper
+// than the ripples are long. Never quite zero, so the very edge of the water still moves
+float speed2(vec2 uv) { return max(tanh(max(texture(u_floor, uv).a + u_tide * 1.1, 0.0) / 0.45), 0.04); }
 void main() {
   vec4 s = texture(u_state, v_uv);
-  float avg = 0.25 * (
-    texture(u_state, v_uv + vec2(u_texel.x, 0.0)).r + texture(u_state, v_uv - vec2(u_texel.x, 0.0)).r +
-    texture(u_state, v_uv + vec2(0.0, u_texel.y)).r + texture(u_state, v_uv - vec2(0.0, u_texel.y)).r);
-  s.g += (avg - s.r) * 2.0;
+  // the shallow-water wave equation, d²h/dt² = div(c² grad h), with c² taken between each pair of cells: ripples
+  // slow down, bunch up and grow taller as the water shoals, bend around the shallows and partly reflect off them
+  vec2 ex = vec2(u_texel.x, 0.0), ey = vec2(0.0, u_texel.y);
+  float k0 = speed2(v_uv);
+  float flow = (k0 + speed2(v_uv + ex)) * (texture(u_state, v_uv + ex).r - s.r)
+             + (k0 + speed2(v_uv - ex)) * (texture(u_state, v_uv - ex).r - s.r)
+             + (k0 + speed2(v_uv + ey)) * (texture(u_state, v_uv + ey).r - s.r)
+             + (k0 + speed2(v_uv - ey)) * (texture(u_state, v_uv - ey).r - s.r);
+  s.g += flow * 0.25;                               // in deep water exactly the old 2 * (average - h)
   s.g *= u_damp;
   s.r += s.g;
   s.r *= 0.9993;
