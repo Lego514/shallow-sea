@@ -6,6 +6,8 @@ An interactive tropical shore seen from above. Waves come in sets and wash up th
 
 **▶ Play it in your browser: <https://lego514.github.io/shallow-sea/>** — the gear in the bottom-right corner opens the settings (English or 中文).
 
+**▶ Watch the 43-second intro video:** [English](https://github.com/Lego514/shallow-sea/releases/download/intro-video/shallow-sea-intro-en.mp4) · [中文](https://github.com/Lego514/shallow-sea/releases/download/intro-video/shallow-sea-intro-zh.mp4) (1080p MP4, rendered from the wallpaper itself by [`tools/make_video.py`](tools/make_video.py)).
+
 [中文說明](#中文說明)
 
 | Morning | Sunset | Night |
@@ -96,6 +98,7 @@ src/                          the source of sea.js, by subject (see src/README.m
   creatures/                  spawning and behaviour: fish, rays, turtles, jellies, dolphins, sharks, hatchlings
 tools/build.py                joins src/ into shallow-sea/sea.js; `--check` fails if sea.js is out of date
 tools/render_test.py          renders four fixed scenes and compares them with tests/render/ (see src/README.md)
+tools/make_video.py           renders the intro video: scripted shots with a cursor and captions, in English and Chinese
 tests/render/                 the render test's reference pictures
 docs/                         the screenshots in this README, and the write-ups
 .github/workflows/pages.yml   on every push to main: checks the build, runs the render test, then publishes the web version to GitHub Pages
@@ -147,6 +150,8 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 - [在瀏覽器裡畫出水底光紋：用折射的 Jacobian 算出海床上的光](docs/caustics.zh-TW.md)：在一個片段著色器裡逐像素算出焦散、吸收和折射。
 
 **線上玩：<https://lego514.github.io/shallow-sea/>**（右下角齒輪可以調設定、切換中文／English）
+
+**▶ 43 秒介紹影片：**[中文](https://github.com/Lego514/shallow-sea/releases/download/intro-video/shallow-sea-intro-zh.mp4) · [English](https://github.com/Lego514/shallow-sea/releases/download/intro-video/shallow-sea-intro-en.mp4)（1080p MP4，用 [`tools/make_video.py`](tools/make_video.py) 直接從桌布畫出來）
 
 ### 安裝成桌布
 
