@@ -9,7 +9,7 @@ python tools/build.py --check  # what CI runs: fails if sea.js is not what src/ 
 
 ## The render test
 
-`tools/render_test.py` opens the wallpaper in headless Chromium with software WebGL (SwiftShader) and plays four fixed scenes: noon with a splash, sunset on another shore, night with glowing jellies, and dolphins with a shark. The seabed, the hour, the random numbers and the clock are all pinned, so each scene draws the same pixels on any computer, Windows or Linux. The test fails if a shader doesn't compile, the page logs an error or a WebGL warning, or a scene's last frame differs from its reference picture in `tests/render/`. CI runs it before publishing the web version, and a failed run keeps what it drew, with a difference picture, as the `render-test` artifact.
+`tools/render_test.py` opens the wallpaper in headless Chromium with software WebGL (SwiftShader) and plays five fixed scenes: noon with a splash, sunset on another shore, night with glowing jellies, dolphins with a shark, and an octopus jetting away from beside an anemone. The seabed, the hour, the random numbers and the clock are all pinned, so each scene draws the same pixels on any computer, Windows or Linux. The test fails if a shader doesn't compile, the page logs an error or a WebGL warning, or a scene's last frame differs from its reference picture in `tests/render/`. CI runs it before publishing the web version, and a failed run keeps what it drew, with a difference picture, as the `render-test` artifact.
 
 ```bash
 pip install playwright==1.63.0
@@ -38,7 +38,7 @@ The seabed itself (`shaders/seabed.js`, built by `targets.js`) is drawn only whe
 | `shaders/coast.js` | the baked coast map (distance from the shore, distance along it) |
 | `shaders/seabed.js` | the seabed's six passes: relief; sand and seagrass; boulders; coral reefs; coral gardens and the water depth; pebbles and starfish |
 | `shaders/ripples.js` | the ripple simulation and the impulses that start ripples |
-| `shaders/sprites/` | the sprite vertex shader, then one file per group of creatures, then `main.js`, which puts the four fragment programs together |
+| `shaders/sprites/` | the sprite vertex shader, then one file per group of creatures, then `main.js`, which puts the five fragment programs together |
 | `shaders/composite.js` | the final image, including the wind waves that feel the bottom (`waveHere`) and the glitter |
 | `shaders/sand.js` | writing in the sand, and the swash smoothing it away |
 | `gl.js` | compiling every program side by side (`KHR_parallel_shader_compile`), render targets, instance batches |

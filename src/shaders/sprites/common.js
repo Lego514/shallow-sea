@@ -1,4 +1,4 @@
-// the fragment shader's start, shared by the four sprite programs: inputs, noise, compositing, the glow flag
+// the fragment shader's start, shared by the five sprite programs: inputs, noise, compositing, the glow flag
 const SPRITE_HEAD = /* glsl */`#version 300 es
 precision highp float;
 precision highp int;

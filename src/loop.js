@@ -36,6 +36,7 @@ function step(dt) {
   updateGulls(dt);
   updateDolphins(dt);
   updateSharks(dt);
+  updateReef(dt);
   waveSounds();
   updateFloats(dt);
   updateRain(dt);

@@ -17,6 +17,14 @@ function packInstances() {
     d[o + 8] = col[0]; d[o + 9] = col[1]; d[o + 10] = col[2]; d[o + 11] = extra;
   };
   for (const r of rays) if (r.kind === 2 && r.away <= 0) put(r.x, r.y, r.ang, r.len, 2, r.phase, 0, RAY_KINDS[2].depth, r.col, r.extra);
+  // clownfish deep in their anemone go under its tentacles
+  for (const c of clowns) if (c.hide > 0.5) put(c.x, c.y, c.ang, c.len, 1, c.phase, c.bend, 1, CLOWN_COL, 4);
+  const down = Math.atan2(world.current[1], world.current[0]);
+  for (const a of anemones) put(a.x, a.y, down, a.len, 17, a.phase, a.pull, 1, [0, 0, 0], a.look);
+  const o = octopus;
+  if (o && o.state !== 'jet') put(o.x, o.y, o.ang, o.len, 18, o.phase, o.spread, 1, [o.camo, o.flash, o.flat], o.seed);
+  // ink hangs low over the seabed: drawn as part of it, it darkens the sand (in mid-water the water's own glow hid it)
+  for (const k of inks) put(k.x, k.y, 0, k.len, 19, k.age, 0, 0.95, [0, 0, 0], k.seed);
   deepBatch.count = n;
   n = 0;
   d = fishBatch.data;
@@ -31,6 +39,8 @@ function packInstances() {
   }
   for (const k of sharks) put(k.x, k.y, k.ang, k.len, 16, k.phase, k.bend, k.depth, k.col, 0);
   for (const f of fish) if (f.kind === 1) put(f.x, f.y, f.ang, f.len, 1, f.phase, f.bend, f.depth, f.col, f.extra);
+  for (const c of clowns) if (c.hide <= 0.5) put(c.x, c.y, c.ang, c.len, 1, c.phase, c.bend, 0.85 + 0.15 * c.hide, CLOWN_COL, 4);
+  if (o && o.state === 'jet') put(o.x, o.y, o.ang, o.len, 18, o.phase, o.spread, 0.8, [o.camo, o.flash, o.flat], o.seed);
   for (const f of fish) if (f.kind === 0) put(f.x, f.y, f.ang, f.len, 0, f.phase, f.bend, f.depth, f.col, f.extra);
   fishBatch.count = n;
 

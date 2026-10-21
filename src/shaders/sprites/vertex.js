@@ -35,7 +35,9 @@ void main() {
   else if (sp < 13.5) { ext = vec2(0.6, 0.3); off = vec2(-0.03, 0.0); } // dolphin
   else if (sp < 14.5) ext = vec2(1.0, 1.0);                              // whitewater from a leap
   else if (sp < 15.5) ext = vec2(0.62, 0.62);                            // turtle hatchling
-  else { ext = vec2(0.58, 0.3); off = vec2(-0.02, 0.0); }               // reef shark
+  else if (sp < 16.5) { ext = vec2(0.58, 0.3); off = vec2(-0.02, 0.0); } // reef shark
+  else if (sp < 18.5) ext = vec2(0.62, 0.62);                            // sea anemone, octopus
+  else ext = vec2(0.66, 0.66);                                           // octopus ink
   vec2 pos = i_a.xy;
   vec2 uv = clamp(vec2(pos.x / u_aspect, pos.y), 0.0, 1.0);
   float blur = 0.0;

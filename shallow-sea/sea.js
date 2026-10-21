@@ -25,6 +25,7 @@ const MAX_DOLPHINS = 6;
 const MAX_SPRAY = 8;
 const MAX_HATCH = 12;
 const MAX_SHARKS = 2;
+const MAX_REEF = 16;     // anemones, clownfish, the octopus and its ink
 
 const canvas = document.getElementById('sea');
 const msgEl = document.getElementById('msg');
@@ -62,6 +63,8 @@ const S = {
   feed: true,                  // hold still on the water to sprinkle fish food
   dolphins: true,              // a pod passes through the deep water every few minutes
   sharks: true,                // a blacktip reef shark patrols the reef edge now and then
+  anemones: true,              // sea anemones in the shallows, each with its clownfish
+  octopus: true,               // an octopus that changes colour to hide
   tide: true,
   sound: false,
   volume: 0.48,
@@ -888,7 +891,9 @@ void main() {
   else if (sp < 13.5) { ext = vec2(0.6, 0.3); off = vec2(-0.03, 0.0); } // dolphin
   else if (sp < 14.5) ext = vec2(1.0, 1.0);                              // whitewater from a leap
   else if (sp < 15.5) ext = vec2(0.62, 0.62);                            // turtle hatchling
-  else { ext = vec2(0.58, 0.3); off = vec2(-0.02, 0.0); }               // reef shark
+  else if (sp < 16.5) { ext = vec2(0.58, 0.3); off = vec2(-0.02, 0.0); } // reef shark
+  else if (sp < 18.5) ext = vec2(0.62, 0.62);                            // sea anemone, octopus
+  else ext = vec2(0.66, 0.66);                                           // octopus ink
   vec2 pos = i_a.xy;
   vec2 uv = clamp(vec2(pos.x / u_aspect, pos.y), 0.0, 1.0);
   float blur = 0.0;
@@ -919,7 +924,7 @@ void main() {
   gl_Position = vec4(w.x / u_aspect * 2.0 - 1.0, w.y * 2.0 - 1.0, 0.0, 1.0);
 }`;
 
-// the fragment shader's start, shared by the four sprite programs: inputs, noise, compositing, the glow flag
+// the fragment shader's start, shared by the five sprite programs: inputs, noise, compositing, the glow flag
 const SPRITE_HEAD = /* glsl */`#version 300 es
 precision highp float;
 precision highp int;
@@ -940,19 +945,19 @@ float g_glow = -1.0;                                          // a sprite's own 
 const SPRITE_FISH = /* glsl */`#if defined(G_SMALL)
 // reef fish seen from above, head along +x, in body lengths: snout at x = 0.5, tail tips at -0.5.
 // x of v_b: 0 a little schooling fish, 1 a big fish; w of v_c says which big fish: 1 yellow tang, 2 sergeant major,
-// 3 bluefin trevally
+// 3 bluefin trevally, 4 clownfish
 vec4 fish(vec2 q, out float sha) {
   float phase = v_b.y, bend = v_b.z, look = v_c.w;
   float bigF = step(0.5, v_b.x);
   float isTang = bigF * step(0.5, look) * step(look, 1.5), isSgt = bigF * step(1.5, look) * step(look, 2.5);
-  float isTrev = bigF * step(2.5, look), isSmall = 1.0 - bigF;
+  float isTrev = bigF * step(2.5, look) * step(look, 3.5), isClown = bigF * step(3.5, look), isSmall = 1.0 - bigF;
   float aa = fwidth(q.x) + v_blur;
   float t = q.x + 0.5;                       // 0 tail tip .. 1 snout
   float tl = clamp(1.0 - t, 0.0, 1.0);
   q.y -= bend * (q.x - 0.25) * (q.x - 0.25);
   q.y -= 0.075 * tl * tl * sin(t * 6.0 - phase);
   float ay = abs(q.y);
-  float mw = isSmall * 0.075 + isTang * 0.11 + isSgt * 0.135 + isTrev * 0.11;
+  float mw = isSmall * 0.075 + isTang * 0.11 + isSgt * 0.135 + isTrev * 0.11 + isClown * 0.15;
 
   // body: a rounded head (a pointed snout on the tang), widest a third of the way back, narrowing into the tail stock
   float sb = (t - 0.18) / 0.82, w;
@@ -964,16 +969,17 @@ vec4 fish(vec2 q, out float sha) {
     w = mw * mix(mix(0.2, 0.15, isTrev), 1.0, sin(e * 1.5707963));
   }
   float body = smoothstep(aa, -aa, max(ay - w, max(-sb, sb - 1.0) * 0.85));
-  // tail: forked on most, nearly square on the tang, a deep crescent on the trevally
+  // tail: forked on most, nearly square on the tang, a deep crescent on the trevally, a rounded fan on the clownfish
   float u = t / 0.2;
   float fork = isSmall * 0.6 + isSgt * 0.5 + isTrev * 0.85 + isTang * 0.08;
   float outer = mw * mix(mix(1.25, 1.5, isTrev), 0.2, clamp(u, 0.0, 1.0));
+  outer = mix(outer, mw * (0.25 + 0.9 * sin(clamp(1.0 - u, 0.0, 1.0) * 2.9)), isClown);
   float notch = mw * 1.1 * clamp(1.0 - u / max(fork, 0.05), 0.0, 1.0) * step(0.1, fork);
   float tail = smoothstep(aa, -aa, max(max(ay - outer, notch - ay), max(-t, t - 0.21)));
   // pectoral fins flicking at the sides; long sickles on the trevally
   float flap = sin(phase * 0.5 + 1.0);
   vec2 fd = normalize(vec2(-0.75, 0.62 + 0.25 * flap));
-  float fL = mix(0.07, 0.11, isTrev), fW = mix(0.026, 0.02, isTrev);
+  float fL = mix(0.07, 0.11, isTrev) + 0.03 * isClown, fW = mix(0.026, 0.02, isTrev) + 0.016 * isClown;
   vec2 fq = vec2(q.x - 0.13, ay - mw * 0.8) - fd * fL * 0.6;
   float fin = smoothstep(aa, -aa, (length(vec2(dot(fq, fd) / fL, dot(fq, vec2(-fd.y, fd.x)) / fW)) - 1.0) * fW);
   // the dorsal fin, seen edge-on as a thin strip along the back
@@ -994,7 +1000,11 @@ vec4 fish(vec2 q, out float sha) {
   // bluefin trevally: a blue-green back flecked with black, silver-blue flanks
   vec3 cTrev = mix(back, vec3(0.7, 0.8, 0.88), smoothstep(0.45, 0.95, cy));
   cTrev *= 1.0 - 0.35 * step(0.82, hash21(floor(q * 70.0))) * smoothstep(0.7, 0.2, cy);
-  vec3 bc = cSmall * isSmall + cTang * isTang + cSgt * isSgt + cTrev * isTrev;
+  // clownfish: bright orange with three white bands, each edged in black; the middle one bulges forward
+  float band = min(min(abs(q.x - 0.25) - 0.03, abs(q.x - 0.01 - 0.05 * (1.0 - cy * cy)) - 0.045), abs(q.x + 0.27) - 0.022);
+  vec3 cClown = mix(back * (0.85 + 0.15 * nz), vec3(0.05), smoothstep(0.016, 0.009, band));
+  cClown = mix(cClown, vec3(0.97, 0.96, 0.93), smoothstep(0.004, -0.004, band));
+  vec3 bc = cSmall * isSmall + cTang * isTang + cSgt * isSgt + cTrev * isTrev + cClown * isClown;
   bc *= 0.8 + 0.25 * nz;                                                                   // rounded
   bc = mix(bc, back * 0.6, dors * (1.0 - isTang) * 0.6);
   // eyes on the sides of the head
@@ -1003,9 +1013,12 @@ vec4 fish(vec2 q, out float sha) {
   bc = mix(bc, vec3(0.75, 0.78, 0.8), smoothstep(er * 1.6, er * 1.15, length(eq)) * isSmall * 0.6);
   bc = mix(bc, vec3(0.04), smoothstep(er + aa, er - aa, length(eq)));
   // fins: see-through, tinted to the fish; electric blue on the trevally, dark-edged tail on the sergeant major
-  vec3 finCol = isSmall * vec3(0.75, 0.82, 0.86) + isTang * back + isSgt * vec3(0.7, 0.72, 0.6) + isTrev * vec3(0.2, 0.55, 0.95);
+  vec3 finCol = isSmall * vec3(0.75, 0.82, 0.86) + isTang * back + isSgt * vec3(0.7, 0.72, 0.6) + isTrev * vec3(0.2, 0.55, 0.95)
+              + isClown * back;
   finCol = mix(finCol, vec3(0.12), isSgt * smoothstep(0.6, 1.0, ay / max(outer, 1e-3)) * tail);
-  vec4 col = vec4(finCol, 1.0) * max(tail, fin) * mix(0.45, 0.75, bigF);
+  finCol = mix(finCol, vec3(0.06), isClown * max(smoothstep(0.75, 0.95, ay / max(outer, 1e-3)) * tail * step(t, 0.17),
+                                                 smoothstep(0.3, 0.9, dot(fq, fd) / fL) * fin));
+  vec4 col = vec4(finCol, 1.0) * max(tail, fin) * mix(0.45, 0.75, bigF) * (1.0 + 0.3 * isClown);
   col = over(vec4(bc, 1.0) * body * 0.96, col);
   sha = max(body * 0.85, max(tail, fin) * 0.45);
   return col;
@@ -1699,6 +1712,142 @@ vec4 gull(vec2 q, out float sha) {
 #endif
 `;
 
+// sprites: the reef's residents, sea anemones and an octopus, and the ink an octopus leaves behind
+const SPRITE_REEF = /* glsl */`#if defined(G_REEF)
+uniform sampler2D u_floor;
+float sminO(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+// distance from p to the segment ab, and how far along it the nearest point is
+float segDist(vec2 p, vec2 a, vec2 b, out float h) {
+  vec2 pa = p - a, ba = b - a;
+  h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-8), 0.0, 1.0);
+  return length(pa - ba * h);
+}
+
+// a bubble-tip sea anemone seen from above, in diameters: rings of fat tentacles around the oral disc, each swelling
+// to a bulb near its tip. They sway, lean down-current (the quad's heading) and pull in when touched.
+// y of v_b: time, z: how far the tentacles are pulled in; w of v_c: which colours (0 green with pink tips, 1 rose)
+vec4 anemone(vec2 q, out float sha) {
+  float t = v_b.y, pull = v_b.z, look = v_c.w;
+  float aa = fwidth(q.x) + v_blur;
+  vec3 baseC = mix(vec3(0.50, 0.52, 0.30), vec3(0.70, 0.30, 0.32), step(0.5, look));
+  vec3 tipC = mix(vec3(0.95, 0.50, 0.72), vec3(1.0, 0.74, 0.66), step(0.5, look));
+  float r = length(q);
+  // the oral disc, with the mouth in the middle; mostly hidden under the inner tentacles
+  float disc = smoothstep(aa, -aa, r - 0.085);
+  vec3 dc = mix(vec3(0.36, 0.30, 0.20), vec3(0.58, 0.50, 0.36), smoothstep(0.085, 0.0, r));
+  dc = mix(dc, vec3(0.22, 0.13, 0.10), smoothstep(0.016 + aa, 0.016 - aa, length(q * vec2(1.0, 2.4))));
+  vec4 col = vec4(dc, 1.0) * disc;
+  float ang = atan(q.y, q.x);
+  // the outer ring first: the tentacles nearer the middle stand up over it
+  for (int ring = 2; ring >= 0; ring--) {
+    float fr = float(ring), N = 13.0 + 7.0 * fr;
+    float r0 = 0.045 + 0.05 * fr;
+    float L = (0.15 + 0.035 * fr) * (1.0 - 0.45 * pull);
+    float th = (0.021 + 0.003 * fr) * (1.0 + 0.35 * pull);
+    float near = floor((ang / 6.2831853 - 0.35 * fr / N) * N + 0.5);
+    float best = 1e3, bh = 0.0, bv = 0.0;
+    for (int k = -1; k <= 1; k++) {
+      float id = mod(near + float(k), N);
+      float hv = hash21(vec2(id, fr + look * 7.0));
+      float a = (id + 0.35 * fr + (hv - 0.5) * 0.45) / N * 6.2831853;
+      float sw = (0.13 * sin(t * 1.3 + id * 0.9 + fr * 1.7) + 0.05 * sin(t * 2.9 + id * 2.3)) * (1.0 - 0.6 * pull);
+      vec2 b = vec2(cos(a), sin(a)) * r0;
+      float l = L * (0.85 + 0.3 * hv);
+      vec2 m = b + vec2(cos(a + sw), sin(a + sw)) * l * 0.5;
+      vec2 e = m + vec2(cos(a + sw * 2.0), sin(a + sw * 2.0)) * l * 0.5 + vec2(0.035, 0.0) * (1.0 - pull);
+      float h1, h2;
+      float d1 = segDist(q, b, m, h1), d2 = segDist(q, m, e, h2);
+      float h = d1 < d2 ? h1 * 0.5 : 0.5 + h2 * 0.5;
+      float rad = th * (0.85 + 0.15 * h + 0.55 * exp(-pow((h - 0.8) / 0.13, 2.0)));
+      float dd = min(d1, d2) - rad;
+      if (dd < best) { best = dd; bh = h; bv = hv; }
+    }
+    float cov = smoothstep(aa, -aa, best);
+    float nz = clamp(-best / (th * 1.3), 0.0, 1.0);
+    vec3 c = mix(baseC * (0.85 + 0.3 * bv), tipC, smoothstep(0.55, 0.95, bh));
+    c *= (0.62 + 0.48 * sqrt(nz)) * (0.92 + 0.05 * (2.0 - fr));
+    col = over(vec4(c, 1.0) * cov, col);
+  }
+  sha = col.a * 0.5;
+  return col;
+}
+
+// an octopus seen from above, in arm spans: the mantle behind, the head with its eyes, eight arms around them,
+// webbed at the roots. y of v_b: time, z: how far the arms are spread (0 trailing behind it in a jet, 1 spread on
+// the seabed); rgb of v_c: camouflage (0 its own colours .. 1 the seabed's), a startled dark flash, how flat it
+// presses itself; w: a seed for its mottling
+vec4 octopus(vec2 q, out float sha) {
+  float t = v_b.y, spread = v_b.z, camo = v_c.r, flash = v_c.g, press = v_c.b, seed = v_c.w;
+  float aa = fwidth(q.x) + v_blur;
+  vec2 mq = (q - vec2(-0.16, 0.0)) / vec2(0.145 * (1.0 - 0.1 * press), 0.1 * (1.0 + 0.25 * press));
+  float d = sminO((length(mq) - 1.0) * 0.1, length((q - vec2(-0.02, 0.0)) / vec2(0.08, 0.085)) * 0.08 - 0.08, 0.035);
+  float arms = 1e3, armS = 0.0;
+  for (int i = 0; i < 8; i++) {
+    float fi = float(i), side = i < 4 ? 1.0 : -1.0, k = mod(fi, 4.0);
+    float hv = hash21(vec2(fi, seed * 13.0));
+    // spread round it on the seabed, reaching and curling in turn; in a jet, all trailing straight behind
+    float a = mix(side * (0.03 + 0.035 * k), side * (0.35 + 0.7 * k) + 0.18 * sin(t * 1.6 + fi * 1.7), spread);
+    float curl = mix(0.35 * sin(t * 2.4 - fi), (0.6 + 0.6 * sin(t * 0.5 + fi * 2.3)) * side * (0.5 + hv), spread);
+    float segL = mix(0.1, 0.08 + 0.015 * hv, spread);
+    vec2 p = vec2(0.02, 0.0) + vec2(cos(a), sin(a)) * 0.04;
+    for (int j = 0; j < 4; j++) {
+      float fj = float(j);
+      a += curl * (0.15 + 0.25 * fj);                    // curling more towards the tip
+      vec2 nx = p + vec2(cos(a), sin(a)) * segL;
+      float h;
+      float dd = segDist(q, p, nx, h);
+      float s = (fj + h) / 4.0;                          // 0 at the root, 1 at the tip
+      dd -= mix(0.05, 0.009, s) * (1.0 + 0.2 * press);
+      if (dd < arms) { arms = dd; armS = s; }
+      p = nx;
+    }
+  }
+  d = sminO(d, arms, 0.04);                             // webbed between the arms' roots
+  float body = smoothstep(aa, -aa, d);
+
+  // its own colours: a mottled red-brown, pale papillae, dark bands rippling over it as it moves
+  float m = clamp(0.5 + 0.6 * gnoise(q * 14.0 + seed * 31.0) + 0.3 * gnoise(q * 31.0 - seed * 7.0), 0.0, 1.0);
+  vec3 own = mix(vec3(0.46, 0.17, 0.10), vec3(0.86, 0.48, 0.30), m);
+  float pap = step(0.86, hash21(floor(q * 70.0 + seed * 5.0)));
+  own = mix(own, vec3(0.92, 0.80, 0.68), pap * 0.5);
+  own *= 1.0 - 0.35 * smoothstep(0.4, 1.0, sin(dot(q, vec2(1.0, 0.3)) * 26.0 + t * 5.0)) * (1.0 - press) * spread;
+  float rim = smoothstep(0.0, -0.03, d);
+  own *= 0.75 + 0.35 * rim;
+  // startled: dark red with pale spots
+  vec2 sq = q * 30.0 + seed * 3.0;
+  float spot = step(0.6, hash21(floor(sq))) * smoothstep(0.34, 0.24, length(fract(sq) - 0.5));
+  vec3 alarm = mix(vec3(0.32, 0.07, 0.05), vec3(0.95, 0.90, 0.85), spot);
+  own = mix(own, alarm, flash);
+  // camouflage: the seabed under it, a little textured, so that a sharp eye can still find it
+  vec3 sea = texelFetch(u_floor, ivec2(gl_FragCoord.xy), 0).rgb;
+  float cam = camo * (1.0 - flash);
+  vec3 c = mix(own, sea * (0.9 + 0.18 * (m - 0.5) + 0.1 * pap) * (0.92 + 0.08 * rim), cam);
+  // the eyes: raised bumps on the head with a dark bar for a pupil
+  vec2 eq = vec2(q.x + 0.01, abs(q.y) - 0.055);
+  c = mix(c, vec3(0.85, 0.78, 0.55), smoothstep(0.02 + aa, 0.02 - aa, length(eq)) * (1.0 - 0.7 * cam));
+  c = mix(c, vec3(0.03), smoothstep(0.007 + aa, 0.007 - aa, length(eq * vec2(0.6, 2.2))) * (1.0 - 0.5 * cam));
+  c *= 1.0 - 0.18 * smoothstep(-0.012, 0.0, d) * (1.0 - 0.5 * cam);
+  sha = body * mix(0.5, 0.15, press);
+  return vec4(c, 1.0) * body;
+}
+
+// ink: a dark cloud that spreads and thins out. y of v_b: its age in seconds
+vec4 ink(vec2 q, out float sha) {
+  float age = v_b.y, seed = v_c.w;
+  float k = clamp(age / 5.0, 0.0, 1.0);
+  vec2 w = q + 0.12 * vec2(gnoise(q * 6.0 + seed * 9.0 + age * 0.3), gnoise(q * 6.0 - seed * 5.0 - age * 0.3));
+  float r = mix(0.16, 0.56, sqrt(k));
+  float dens = smoothstep(r, r * 0.35, length(w)) * (0.75 + 0.25 * gnoise(w * 10.0 + seed * 4.0));
+  float a = clamp(dens * pow(1.0 - k, 1.5) * 1.7, 0.0, 0.95) * smoothstep(0.0, 0.12, age);
+  sha = a * 0.6;
+  return vec4(vec3(0.06, 0.045, 0.05) * a, a);
+}
+
+#endif
+`;
 // the fragment shader's main, then the whole fragment shader put together
 const SPRITE_MAIN = /* glsl */`void main() {
   // each program holds one group of species (see SPRITE_GROUP), so it only tells those apart
@@ -1719,6 +1868,10 @@ const SPRITE_MAIN = /* glsl */`void main() {
   else c = manta(v_q, sha);
 #elif defined(G_TURTLE)
   c = turtle(v_q, sha);
+#elif defined(G_REEF)
+  if (sp < 17.5) c = anemone(v_q, sha);
+  else if (sp < 18.5) c = octopus(v_q, sha);
+  else c = ink(v_q, sha);
 #else
   if (sp < 7.5) c = moonJelly(v_q, sha);
   else if (sp < 8.5) c = lagoonJelly(v_q, sha);
@@ -1729,7 +1882,7 @@ const SPRITE_MAIN = /* glsl */`void main() {
   else if (u_shadow == 2) o = vec4(0.0, sp > 6.5 && sp < 8.5 ? (g_glow >= 0.0 ? g_glow : min(c.a * 1.8, 1.0)) : 0.0, 0.0, 0.0);   // jellyfish glow
   else o = c;
 }`;
-const SPRITE_FS = [SPRITE_HEAD, SPRITE_FISH, SPRITE_RAYS, SPRITE_JELLIES, SPRITE_FLOATS, SPRITE_TURTLE, SPRITE_BEACH, SPRITE_BIG, SPRITE_SURFACE, SPRITE_MAIN].join('');
+const SPRITE_FS = [SPRITE_HEAD, SPRITE_FISH, SPRITE_RAYS, SPRITE_JELLIES, SPRITE_FLOATS, SPRITE_TURTLE, SPRITE_BEACH, SPRITE_BIG, SPRITE_SURFACE, SPRITE_REEF, SPRITE_MAIN].join('');
 
 // ---- final image
 const COMPOSITE_FS = /* glsl */`#version 300 es
@@ -2133,9 +2286,9 @@ const rgba16f = (w, h) => makeTarget(w, h, gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT);
 
 gl.getExtension('KHR_parallel_shader_compile');
 // species → which sprite program draws it. One program for every species took the longest of all to compile;
-// four smaller ones compile side by side
-const SPRITE_GROUPS = ['G_SMALL', 'G_RAY', 'G_TURTLE', 'G_BIG'];
-const SPRITE_GROUP = [0, 0, 1, 0, 0, 1, 1, 3, 3, 2, 0, 0, 0, 3, 0, 0, 3];
+// five smaller ones compile side by side
+const SPRITE_GROUPS = ['G_SMALL', 'G_RAY', 'G_TURTLE', 'G_BIG', 'G_REEF'];
+const SPRITE_GROUP = [0, 0, 1, 0, 0, 1, 1, 3, 3, 2, 0, 0, 0, 3, 0, 0, 3, 4, 4, 4];
 const spriteFS = g => SPRITE_FS.replace('#version 300 es\n', '#version 300 es\n#define ' + g + '\n');
 let floorHeightP, floorBaseP, floorRocksP, floorReefP, floorGardenP, floorDetailP, stepP, dropP, spriteP, compP, sandP, coastP;
 try {
@@ -2179,8 +2332,8 @@ function makeBatch(max) {
   gl.bindVertexArray(null);
   return { vao, buf, data: new Float32Array(max * 12), count: 0 };
 }
-const deepBatch = makeBatch(4);
-const fishBatch = makeBatch(MAX_FISH + 32 + MAX_PELLETS + MAX_DOLPHINS + MAX_SHARKS);
+const deepBatch = makeBatch(4 + MAX_REEF);
+const fishBatch = makeBatch(MAX_FISH + 32 + MAX_PELLETS + MAX_DOLPHINS + MAX_SHARKS + MAX_REEF);
 const floatBatch = makeBatch(MAX_FLOATS + 6 + MAX_PELLETS + MAX_DOLPHINS + MAX_SPRAY + MAX_HATCH);
 const skyBatch = makeBatch(6);
 
@@ -2393,8 +2546,8 @@ function shoreParams() {
   }
 }
 
-// a small CPU copy of the depth map so fish keep off the sand
-let depthMap = null, dmW = 0, dmH = 0;
+// a small CPU copy of the depth map so fish keep off the sand, and of the seabed's colours
+let depthMap = null, floorCol = null, dmW = 0, dmH = 0;
 function readDepthMap() {
   dmW = 160; dmH = Math.max(2, Math.round(dmW / aspect));
   const small = rgba16f(dmW, dmH);
@@ -2408,6 +2561,20 @@ function readDepthMap() {
   freeTarget(small);
   depthMap = new Float32Array(dmW * dmH);
   for (let i = 0; i < depthMap.length; i++) depthMap[i] = px[i * 4 + 3];
+  floorCol = px;
+}
+// how busy the seabed looks around (x, y): the spread of its colours, low on plain sand or rock, high among corals
+function seabedBusy(x, y) {
+  if (!floorCol) return 0;
+  const cx = Math.round(x / aspect * dmW), cy = Math.round(y * dmH);
+  let n = 0;
+  const s = [0, 0, 0], s2 = [0, 0, 0];
+  for (let j = cy - 3; j <= cy + 3; j++) for (let i = cx - 3; i <= cx + 3; i++) {
+    if (i < 0 || j < 0 || i >= dmW || j >= dmH) continue;
+    for (let c = 0; c < 3; c++) { const v = floorCol[(j * dmW + i) * 4 + c]; s[c] += v; s2[c] += v * v; }
+    n++;
+  }
+  return n ? Math.sqrt([0, 1, 2].reduce((a, c) => a + s2[c] / n - (s[c] / n) ** 2, 0)) : 0;
 }
 function depthAt(x, y) {
   if (!depthMap) return 1;
@@ -2478,6 +2645,7 @@ function relocateCreatures() {
   hatchlings = hatchlings.filter(h => h.swim || depthAt(h.x, h.y) < 0.02);
   if (nest && depthAt(nest.x, nest.y) > -0.05) nest = null;
   syncCrabs();
+  placeReef();
 }
 
 // ---------------------------------------------------------------- creatures
@@ -2698,6 +2866,7 @@ function splash(x, y, power) {
     if (d < 0.3) { const k = 1 - d / 0.3; j.vx += dx / d * 0.06 * k; j.vy += dy / d * 0.06 * k; }
   }
   for (const c of crabs) if (Math.hypot(c.x - x, c.y - y) < 0.15) c.hideT = rand(3, 6);
+  startleReef(x, y);
   for (const h of hatchlings) if (Math.hypot(h.x - x, h.y - y) < 0.12) h.freeze = rand(1, 2);
   let startled = null, sd = 0.3;
   for (const d of dolphins) {
@@ -3404,6 +3573,208 @@ function updateRain(dt) {
   }
 }
 
+// ---------------------------------------------------------------- the reef's residents: anemones and their clownfish, an octopus
+// Anemones stay put in the shallows. Two or three clownfish live in each and never stray far: they dive in among the
+// tentacles when something startles them, sleep there at night and dart out for food that drifts close. The octopus
+// creeps over the seabed taking on the colours of whatever it sits on. Come close slowly and it presses itself flat
+// and all but vanishes; startle it and it flashes dark, squirts ink and jets away mantle first.
+let anemones = [];
+let clowns = [];
+let octopus = null;
+let inks = [];
+const CLOWN_COL = [0.98, 0.46, 0.08];
+
+// anemones settle on open sand or rock in the shallows, where they stand out, not in the middle of a coral garden
+function newAnemone() {
+  let best = null, busy = 9;
+  for (let i = 0, found = 0; i < 60 && found < 12; i++) {
+    const [x, y] = randomWaterPoint(0.15, 0.35);
+    if (x < 0.12 || x > aspect - 0.12 || y < 0.12 || y > 0.88 || anemones.some(a => Math.hypot(a.x - x, a.y - y) < 0.4)) continue;
+    found++;
+    const b = seabedBusy(x, y);
+    if (b < busy) { busy = b; best = [x, y]; }
+  }
+  if (!best) return null;
+  return { x: best[0], y: best[1], len: rand(0.13, 0.16), phase: rand(0, 100), pull: 0, pullT: 0, look: Math.random() < 0.5 ? 0 : 1 };
+}
+function newClown(a, i) {
+  const r = rand(0, a.len * 0.4), t = rand(0, TAU);
+  return { home: a, x: a.x + Math.cos(t) * r, y: a.y + Math.sin(t) * r, tx: a.x, ty: a.y, ang: rand(0, TAU), angVel: 0,
+           vx: 0, vy: 0, len: i === 0 ? rand(0.046, 0.05) : rand(0.034, 0.04), phase: rand(0, TAU), bend: 0, timer: 0,
+           hide: 0, hideT: 0, nest: i * 2.1 + rand(0, 1) };
+}
+function placeAnemones() {
+  anemones = [];
+  clowns = [];
+  if (!S.anemones) return;
+  for (let k = 0; k < 2; k++) {
+    const a = newAnemone();
+    if (!a) break;
+    anemones.push(a);
+    const n = Math.random() < 0.5 ? 2 : 3;
+    for (let i = 0; i < n; i++) clowns.push(newClown(a, i));
+  }
+}
+
+function newOctopus() {
+  const [x, y] = randomWaterPoint(0.06, 0.4);
+  return { x, y, tx: x, ty: y, ang: rand(0, TAU), len: rand(0.12, 0.14), phase: rand(0, 100), state: 'rest',
+           timer: rand(2, 6), vx: 0, vy: 0, camo: 0.3, flash: 0, flat: 0, spread: 1, seed: Math.random() };
+}
+// somewhere new to creep to: not far, not dry, not too deep, on the screen
+function octopusTarget(o) {
+  for (let i = 0; i < 30; i++) {
+    const a = rand(0, TAU), r = rand(0.08, 0.25), x = o.x + Math.cos(a) * r, y = o.y + Math.sin(a) * r;
+    const d = depthAt(x, y);
+    if (d > 0.06 && d < 0.45 && x > 0.06 && x < aspect - 0.06 && y > 0.06 && y < 0.94) return [x, y];
+  }
+  return randomWaterPoint(0.06, 0.4);
+}
+
+function syncReef() {
+  if (!S.anemones) { anemones = []; clowns = []; } else if (!anemones.length) placeAnemones();
+  if (!S.octopus) octopus = null; else if (!octopus) octopus = newOctopus();
+  if (!S.octopus) inks = [];
+}
+// a new seabed: anemones grow somewhere else, and the octopus moves if it is now on dry land
+function placeReef() {
+  placeAnemones();
+  if (octopus) {
+    const d = depthAt(octopus.x, octopus.y);
+    if (d < 0.05 || d > 0.6) Object.assign(octopus, newOctopus(), { seed: octopus.seed });
+  }
+  inks = [];
+}
+
+// a splash at (x, y): the anemones pull in, their clownfish dive for cover, the octopus jets away if it is close
+function startleReef(x, y) {
+  for (const a of anemones) {
+    if (Math.hypot(a.x - x, a.y - y) > a.len + 0.12) continue;
+    a.pullT = rand(2.5, 3.5);
+    for (const c of clowns) if (c.home === a) c.hideT = Math.max(c.hideT, rand(2, 4));
+  }
+  const o = octopus;
+  if (o && o.state !== 'jet' && Math.hypot(o.x - x, o.y - y) < 0.2) jetAway(o, x, y);
+}
+
+function jetAway(o, fx, fy) {
+  // away from the fright, turning a little if needed to land somewhere it can settle
+  const away = Math.atan2(o.y - fy, o.x - fx);
+  let best = away, score = -9;
+  for (let k = -4; k <= 4; k++) {
+    const a = away + k * 0.3, ex = o.x + Math.cos(a) * 0.3, ey = o.y + Math.sin(a) * 0.3, d = depthAt(ex, ey);
+    const ok = d > 0.05 && d < 0.6 && ex > 0.04 && ex < aspect - 0.04 && ey > 0.04 && ey < 0.96;
+    const s = (ok ? 1 : 0) - Math.abs(k) * 0.05;
+    if (s > score) { score = s; best = a; }
+  }
+  if (inks.length < 4) inks.push({ x: o.x, y: o.y, age: 0, len: o.len * 1.5, seed: Math.random() });
+  o.vx = Math.cos(best) * 0.3;
+  o.vy = Math.sin(best) * 0.3;
+  o.ang = best + Math.PI;                     // mantle first, the arms trailing behind
+  o.state = 'jet';
+  o.flash = 1;
+  addDrop(o.x, o.y, o.x, o.y, 0.012, -0.05 * S.ripple);
+}
+
+function updateAnemones(dt) {
+  for (const a of anemones) {
+    a.phase += dt;
+    if (mouse.inside && Math.hypot(mouse.x - a.x, mouse.y - a.y) < a.len * 0.6 && (mouse.down || mouse.speed > 0.05)) a.pullT = 2.5;
+    a.pullT = Math.max(0, a.pullT - dt);
+    a.pull += ((a.pullT > 0 ? 1 : 0) - a.pull) * Math.min(1, dt * (a.pullT > 0 ? 5 : 0.7));
+  }
+}
+
+function updateClowns(dt) {
+  const asleep = nightLevel > 0.6;
+  for (const c of clowns) {
+    const a = c.home;
+    if (mouse.inside && Math.hypot(mouse.x - a.x, mouse.y - a.y) < a.len * 1.3 && (mouse.speed > 0.12 || mouse.down))
+      c.hideT = Math.max(c.hideT, rand(1.5, 3));
+    for (const k of sharks) if (Math.hypot(k.x - a.x, k.y - a.y) < 0.3) c.hideT = Math.max(c.hideT, 1);
+    c.hideT = Math.max(0, c.hideT - dt);
+    const hiding = c.hideT > 0 || asleep;
+    // food drifting close is worth a quick dash
+    let food = null, fd = a.len * 1.6;
+    if (!hiding) for (const p of pellets) {
+      if (p.eaten) continue;
+      const d = Math.hypot(p.x - a.x, p.y - a.y);
+      if (d < fd) { fd = d; food = p; }
+    }
+    c.timer -= dt;
+    if (food) {
+      [c.tx, c.ty] = [food.x, food.y];
+      if (Math.hypot(food.x - c.x, food.y - c.y) < c.len * 0.5) { food.eaten = true; c.timer = 0; }
+    } else if (hiding) {
+      const r = a.len * 0.2;                      // tucked in among the tentacles, a stripe or two showing
+      [c.tx, c.ty] = [a.x + Math.cos(c.nest) * r, a.y + Math.sin(c.nest) * r];
+    } else if (c.timer <= 0) {
+      // hover over the anemone, darting from spot to spot
+      const r = a.len * rand(0.1, 0.5), t = rand(0, TAU);
+      [c.tx, c.ty] = [a.x + Math.cos(t) * r, a.y + Math.sin(t) * r];
+      c.timer = rand(0.5, 1.6);
+    }
+    const max = food ? 0.09 : hiding ? 0.08 : 0.035;
+    let wx = (c.tx - c.x) * 4, wy = (c.ty - c.y) * 4;
+    const wl = Math.hypot(wx, wy);
+    if (wl > max) { wx *= max / wl; wy *= max / wl; }
+    const k = Math.min(1, dt * 5);
+    c.vx += (wx - c.vx) * k; c.vy += (wy - c.vy) * k;
+    c.x += c.vx * dt; c.y += c.vy * dt;
+    const sp = steerHeading(c, dt, 7);
+    if (sp < 0.006) c.angVel *= Math.exp(-dt * 4);
+    c.bend += (Math.max(-0.9, Math.min(0.9, c.angVel * 0.22)) - c.bend) * Math.min(1, dt * 10);
+    c.phase += dt * (9 + sp * 150);
+    c.hide += ((hiding ? 1 : 0) - c.hide) * Math.min(1, dt * 4);
+  }
+}
+
+function updateOctopus(dt) {
+  const o = octopus;
+  if (!o) return;
+  o.phase += dt;
+  if (o.state !== 'jet') {
+    const md = mouse.inside ? Math.hypot(mouse.x - o.x, mouse.y - o.y) : 9;
+    let fright = null;
+    if (md < 0.13 && (mouse.speed > 0.15 || mouse.down)) fright = [mouse.x, mouse.y];
+    for (const k of sharks) if (Math.hypot(k.x - o.x, k.y - o.y) < 0.25) fright = [k.x, k.y];
+    if (fright) jetAway(o, ...fright);
+    else if (md < 0.2 && o.state !== 'hide') { o.state = 'hide'; o.timer = rand(4, 7); }   // something looming: freeze, vanish
+  }
+  if (o.state === 'jet') {
+    const k = Math.exp(-dt * 2.2);
+    o.vx *= k; o.vy *= k;
+    o.x += o.vx * dt; o.y += o.vy * dt;
+    if (Math.hypot(o.vx, o.vy) < 0.02) { o.state = 'hide'; o.timer = rand(6, 10); }
+  } else if (o.state === 'crawl') {
+    const dx = o.tx - o.x, dy = o.ty - o.y;
+    if (Math.hypot(dx, dy) < 0.012) { o.state = 'rest'; o.timer = rand(5, 12) * (nightLevel > 0.5 ? 0.5 : 1); }
+    else {
+      o.ang = wrapAngle(o.ang + wrapAngle(Math.atan2(dy, dx) - o.ang) * Math.min(1, dt * 1.5));
+      const sp = 0.016 * (0.4 + 0.6 * Math.sin(o.phase * 1.6) ** 2);   // its arms pull it along in surges
+      o.x += Math.cos(o.ang) * sp * dt; o.y += Math.sin(o.ang) * sp * dt;
+    }
+  } else {
+    o.timer -= dt;
+    if (o.timer <= 0) { [o.tx, o.ty] = octopusTarget(o); o.state = 'crawl'; }
+  }
+  o.x = Math.max(0.03, Math.min(aspect - 0.03, o.x));
+  o.y = Math.max(0.03, Math.min(0.97, o.y));
+  const camo = { jet: 0, crawl: 0.15, rest: 0.7, hide: 0.96 }[o.state];
+  o.camo += (camo - o.camo) * Math.min(1, dt * (o.state === 'hide' ? 2.5 : 0.6));
+  o.flat += ((o.state === 'hide' ? 1 : o.state === 'rest' ? 0.4 : 0) - o.flat) * Math.min(1, dt * 3);
+  o.spread += ((o.state === 'jet' ? 0 : 1) - o.spread) * Math.min(1, dt * (o.state === 'jet' ? 10 : 2));
+  o.flash = Math.max(0, o.flash - dt * 0.7);
+}
+
+function updateReef(dt) {
+  updateAnemones(dt);
+  updateClowns(dt);
+  updateOctopus(dt);
+  const cur = world.current;
+  for (const k of inks) { k.age += dt; k.x += cur[0] * 3 * dt; k.y += cur[1] * 3 * dt; }
+  inks = inks.filter(k => k.age < 5);
+}
 // ---------------------------------------------------------------- light
 //      hour  elev  az   sun colour            ambient                 sky                 plankton reflect glint warm
 const NIGHT = [55, 200, [0.055, 0.075, 0.13], [0.008, 0.014, 0.028], [0.02, 0.035, 0.07], 1.0, 1.4, 0.7, 0.0];
@@ -3488,6 +3859,14 @@ function packInstances() {
     d[o + 8] = col[0]; d[o + 9] = col[1]; d[o + 10] = col[2]; d[o + 11] = extra;
   };
   for (const r of rays) if (r.kind === 2 && r.away <= 0) put(r.x, r.y, r.ang, r.len, 2, r.phase, 0, RAY_KINDS[2].depth, r.col, r.extra);
+  // clownfish deep in their anemone go under its tentacles
+  for (const c of clowns) if (c.hide > 0.5) put(c.x, c.y, c.ang, c.len, 1, c.phase, c.bend, 1, CLOWN_COL, 4);
+  const down = Math.atan2(world.current[1], world.current[0]);
+  for (const a of anemones) put(a.x, a.y, down, a.len, 17, a.phase, a.pull, 1, [0, 0, 0], a.look);
+  const o = octopus;
+  if (o && o.state !== 'jet') put(o.x, o.y, o.ang, o.len, 18, o.phase, o.spread, 1, [o.camo, o.flash, o.flat], o.seed);
+  // ink hangs low over the seabed: drawn as part of it, it darkens the sand (in mid-water the water's own glow hid it)
+  for (const k of inks) put(k.x, k.y, 0, k.len, 19, k.age, 0, 0.95, [0, 0, 0], k.seed);
   deepBatch.count = n;
   n = 0;
   d = fishBatch.data;
@@ -3502,6 +3881,8 @@ function packInstances() {
   }
   for (const k of sharks) put(k.x, k.y, k.ang, k.len, 16, k.phase, k.bend, k.depth, k.col, 0);
   for (const f of fish) if (f.kind === 1) put(f.x, f.y, f.ang, f.len, 1, f.phase, f.bend, f.depth, f.col, f.extra);
+  for (const c of clowns) if (c.hide <= 0.5) put(c.x, c.y, c.ang, c.len, 1, c.phase, c.bend, 0.85 + 0.15 * c.hide, CLOWN_COL, 4);
+  if (o && o.state === 'jet') put(o.x, o.y, o.ang, o.len, 18, o.phase, o.spread, 0.8, [o.camo, o.flash, o.flat], o.seed);
   for (const f of fish) if (f.kind === 0) put(f.x, f.y, f.ang, f.len, 0, f.phase, f.bend, f.depth, f.col, f.extra);
   fishBatch.count = n;
 
@@ -3887,6 +4268,7 @@ function step(dt) {
   updateGulls(dt);
   updateDolphins(dt);
   updateSharks(dt);
+  updateReef(dt);
   waveSounds();
   updateFloats(dt);
   updateRain(dt);
@@ -3953,6 +4335,8 @@ const PROPS = {
   feedFish: v => { S.feed = v === true || v === 'true'; },
   dolphins: v => { S.dolphins = v === true || v === 'true'; if (!S.dolphins) dolphins = []; },
   sharks: v => { S.sharks = v === true || v === 'true'; if (!S.sharks) sharks = []; },
+  anemones: v => { S.anemones = v === true || v === 'true'; syncReef(); },
+  octopus: v => { S.octopus = v === true || v === 'true'; syncReef(); },
   sound: v => { S.sound = v === true || v === 'true'; if (S.sound) audioStart(); audioLevel(); },
   volume: v => { S.volume = v / 100 * 0.8; audioLevel(); },
 };
@@ -3995,6 +4379,10 @@ window.sea = { splash: (x, y) => splash(x * aspect, 1 - y, 1), regenerate, setti
   get pellets() { return pellets; },
   get dolphins() { return dolphins; },
   get sharks() { return sharks; },
+  get anemones() { return anemones; },
+  get clowns() { return clowns; },
+  get octopus() { return octopus; },
+  get inks() { return inks; },
   spawnSharks: () => { spawnSharks(); },
   spawnDolphins: () => { spawnPod(); },
   leapDolphin: i => { const d = dolphins[i ?? 1] || dolphins[0]; if (d && !d.leap) startLeap(d); return !!d; },
@@ -4024,5 +4412,6 @@ syncRays();
 syncJellies();
 syncFloats();
 syncCrabs();
+syncReef();
 requestAnimationFrame(frame);
 })();

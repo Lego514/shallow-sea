@@ -44,6 +44,8 @@ const PROPS = {
   feedFish: v => { S.feed = v === true || v === 'true'; },
   dolphins: v => { S.dolphins = v === true || v === 'true'; if (!S.dolphins) dolphins = []; },
   sharks: v => { S.sharks = v === true || v === 'true'; if (!S.sharks) sharks = []; },
+  anemones: v => { S.anemones = v === true || v === 'true'; syncReef(); },
+  octopus: v => { S.octopus = v === true || v === 'true'; syncReef(); },
   sound: v => { S.sound = v === true || v === 'true'; if (S.sound) audioStart(); audioLevel(); },
   volume: v => { S.volume = v / 100 * 0.8; audioLevel(); },
 };
@@ -86,6 +88,10 @@ window.sea = { splash: (x, y) => splash(x * aspect, 1 - y, 1), regenerate, setti
   get pellets() { return pellets; },
   get dolphins() { return dolphins; },
   get sharks() { return sharks; },
+  get anemones() { return anemones; },
+  get clowns() { return clowns; },
+  get octopus() { return octopus; },
+  get inks() { return inks; },
   spawnSharks: () => { spawnSharks(); },
   spawnDolphins: () => { spawnPod(); },
   leapDolphin: i => { const d = dolphins[i ?? 1] || dolphins[0]; if (d && !d.leap) startLeap(d); return !!d; },
@@ -115,4 +121,5 @@ syncRays();
 syncJellies();
 syncFloats();
 syncCrabs();
+syncReef();
 requestAnimationFrame(frame);

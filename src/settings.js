@@ -19,6 +19,8 @@ const S = {
   feed: true,                  // hold still on the water to sprinkle fish food
   dolphins: true,              // a pod passes through the deep water every few minutes
   sharks: true,                // a blacktip reef shark patrols the reef edge now and then
+  anemones: true,              // sea anemones in the shallows, each with its clownfish
+  octopus: true,               // an octopus that changes colour to hide
   tide: true,
   sound: false,
   volume: 0.48,

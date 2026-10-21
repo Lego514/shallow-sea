@@ -162,8 +162,8 @@ function shoreParams() {
   }
 }
 
-// a small CPU copy of the depth map so fish keep off the sand
-let depthMap = null, dmW = 0, dmH = 0;
+// a small CPU copy of the depth map so fish keep off the sand, and of the seabed's colours
+let depthMap = null, floorCol = null, dmW = 0, dmH = 0;
 function readDepthMap() {
   dmW = 160; dmH = Math.max(2, Math.round(dmW / aspect));
   const small = rgba16f(dmW, dmH);
@@ -177,6 +177,20 @@ function readDepthMap() {
   freeTarget(small);
   depthMap = new Float32Array(dmW * dmH);
   for (let i = 0; i < depthMap.length; i++) depthMap[i] = px[i * 4 + 3];
+  floorCol = px;
+}
+// how busy the seabed looks around (x, y): the spread of its colours, low on plain sand or rock, high among corals
+function seabedBusy(x, y) {
+  if (!floorCol) return 0;
+  const cx = Math.round(x / aspect * dmW), cy = Math.round(y * dmH);
+  let n = 0;
+  const s = [0, 0, 0], s2 = [0, 0, 0];
+  for (let j = cy - 3; j <= cy + 3; j++) for (let i = cx - 3; i <= cx + 3; i++) {
+    if (i < 0 || j < 0 || i >= dmW || j >= dmH) continue;
+    for (let c = 0; c < 3; c++) { const v = floorCol[(j * dmW + i) * 4 + c]; s[c] += v; s2[c] += v * v; }
+    n++;
+  }
+  return n ? Math.sqrt([0, 1, 2].reduce((a, c) => a + s2[c] / n - (s[c] / n) ** 2, 0)) : 0;
 }
 function depthAt(x, y) {
   if (!depthMap) return 1;
@@ -247,5 +261,6 @@ function relocateCreatures() {
   hatchlings = hatchlings.filter(h => h.swim || depthAt(h.x, h.y) < 0.02);
   if (nest && depthAt(nest.x, nest.y) > -0.05) nest = null;
   syncCrabs();
+  placeReef();
 }
 

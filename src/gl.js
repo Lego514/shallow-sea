@@ -52,9 +52,9 @@ const rgba16f = (w, h) => makeTarget(w, h, gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT);
 
 gl.getExtension('KHR_parallel_shader_compile');
 // species → which sprite program draws it. One program for every species took the longest of all to compile;
-// four smaller ones compile side by side
-const SPRITE_GROUPS = ['G_SMALL', 'G_RAY', 'G_TURTLE', 'G_BIG'];
-const SPRITE_GROUP = [0, 0, 1, 0, 0, 1, 1, 3, 3, 2, 0, 0, 0, 3, 0, 0, 3];
+// five smaller ones compile side by side
+const SPRITE_GROUPS = ['G_SMALL', 'G_RAY', 'G_TURTLE', 'G_BIG', 'G_REEF'];
+const SPRITE_GROUP = [0, 0, 1, 0, 0, 1, 1, 3, 3, 2, 0, 0, 0, 3, 0, 0, 3, 4, 4, 4];
 const spriteFS = g => SPRITE_FS.replace('#version 300 es\n', '#version 300 es\n#define ' + g + '\n');
 let floorHeightP, floorBaseP, floorRocksP, floorReefP, floorGardenP, floorDetailP, stepP, dropP, spriteP, compP, sandP, coastP;
 try {
@@ -98,8 +98,8 @@ function makeBatch(max) {
   gl.bindVertexArray(null);
   return { vao, buf, data: new Float32Array(max * 12), count: 0 };
 }
-const deepBatch = makeBatch(4);
-const fishBatch = makeBatch(MAX_FISH + 32 + MAX_PELLETS + MAX_DOLPHINS + MAX_SHARKS);
+const deepBatch = makeBatch(4 + MAX_REEF);
+const fishBatch = makeBatch(MAX_FISH + 32 + MAX_PELLETS + MAX_DOLPHINS + MAX_SHARKS + MAX_REEF);
 const floatBatch = makeBatch(MAX_FLOATS + 6 + MAX_PELLETS + MAX_DOLPHINS + MAX_SPRAY + MAX_HATCH);
 const skyBatch = makeBatch(6);
 

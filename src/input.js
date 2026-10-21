@@ -77,6 +77,7 @@ function splash(x, y, power) {
     if (d < 0.3) { const k = 1 - d / 0.3; j.vx += dx / d * 0.06 * k; j.vy += dy / d * 0.06 * k; }
   }
   for (const c of crabs) if (Math.hypot(c.x - x, c.y - y) < 0.15) c.hideT = rand(3, 6);
+  startleReef(x, y);
   for (const h of hatchlings) if (Math.hypot(h.x - x, h.y - y) < 0.12) h.freeze = rand(1, 2);
   let startled = null, sd = 0.3;
   for (const d of dolphins) {

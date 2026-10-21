@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # nothing is published unless sea.js is built from src/ and four fixed scenes still render as they should
+  # nothing is published unless sea.js is built from src/ and five fixed scenes still render as they should
   test:
     runs-on: ubuntu-latest
     steps:

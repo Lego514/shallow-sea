@@ -24,7 +24,7 @@ ORDER = [
     'shaders/ripples.js',       # the ripple simulation (shallow-water wave equation)
     'shaders/sprites/vertex.js',            # every creature and floating thing, as signed-distance sprites:
     'shaders/sprites/common.js',            #   placed, shadowed and blurred by the vertex shader, drawn by
-    'shaders/sprites/fish.js',              #   one of four fragment programs, each holding one group
+    'shaders/sprites/fish.js',              #   one of five fragment programs, each holding one group
     'shaders/sprites/rays.js',
     'shaders/sprites/jellies.js',
     'shaders/sprites/floats.js',
@@ -32,6 +32,7 @@ ORDER = [
     'shaders/sprites/beach.js',
     'shaders/sprites/sharks-dolphins.js',
     'shaders/sprites/surface.js',
+    'shaders/sprites/reef.js',
     'shaders/sprites/main.js',
     'shaders/composite.js',     # the final image: refraction, caustics, absorption, glints, surf
     'shaders/sand.js',          # writing in the sand
@@ -45,6 +46,7 @@ ORDER = [
     'creatures/hatchlings.js',  # turtle hatchlings on the beach at night
     'creatures/dolphins.js',    # the dolphin pod and its leaps
     'creatures/sharks.js',      # reef sharks
+    'creatures/reef.js',        # anemones and their clownfish, the octopus
     'light.js',                 # the sun and sky through the day
     'frame.js',                 # one frame's work: instances, the ripple simulation, sprites, composite
     'tide.js',

@@ -8,6 +8,7 @@ const MAX_DOLPHINS = 6;
 const MAX_SPRAY = 8;
 const MAX_HATCH = 12;
 const MAX_SHARKS = 2;
+const MAX_REEF = 16;     // anemones, clownfish, the octopus and its ink
 
 const canvas = document.getElementById('sea');
 const msgEl = document.getElementById('msg');

@@ -2,7 +2,7 @@
 
 ![Shallow Sea](shallow-sea/preview.webp)
 
-An interactive tropical shore seen from above. Waves come in sets and wash up the beach, the water deepens from clear shallows over coral reefs and turquoise to deep blue, and fish, rays, sea turtles and jellyfish swim through it, with a pod of dolphins or a reef shark passing now and then. Everything is rendered live in WebGL2. It runs as a desktop wallpaper in [Lively Wallpaper](https://github.com/rocksdanister/lively) or Wallpaper Engine on Windows, or in any browser, phones included.
+An interactive tropical shore seen from above. Waves come in sets and wash up the beach, the water deepens from clear shallows over coral reefs and turquoise to deep blue, and fish, rays, sea turtles and jellyfish swim through it, with a pod of dolphins or a reef shark passing now and then. Clownfish live in sea anemones on the shallow sand, and an octopus changes colour to vanish into the seabed. Everything is rendered live in WebGL2. It runs as a desktop wallpaper in [Lively Wallpaper](https://github.com/rocksdanister/lively) or Wallpaper Engine on Windows, or in any browser, phones included.
 
 **▶ Play it in your browser: <https://lego514.github.io/shallow-sea/>** — the gear in the bottom-right corner opens the settings (English or 中文).
 
@@ -25,7 +25,7 @@ An interactive tropical shore seen from above. Waves come in sets and wash up th
 - **Waves on the GPU**: interactive ripples solve the shallow-water wave equation, d²h/dt² = ∇·(c²∇h), with c² = (g/k)·tanh(kh) from the depth, so ripples slow, bunch up and bend toward the shore. The wind waves feel the bottom too: in the shallows each one follows ω² = gk·tanh(kh), keeps its wavenumber along the coast (Snell's law, Bouguer's on the curved coast) and swings round to face the beach, its phase integrated inward from deep water. Surf follows √(gh) wave speed, breaks according to wave height, and turns parallel to the beach as Snell's law predicts.
 - **Procedural world**: every seabed, coral reef and coral garden is generated from a seed; 15+ species are drawn as animated signed-distance shapes with their own behaviour (boids schooling, breathing turtles, leaping dolphins, patrolling sharks, fish fleeing predators).
 - **Performance work**: the first start after an update went from about 42 s to about 2.3 s by splitting one huge seabed shader into six small single-output passes and the creature shader into four programs, all compiled in parallel (`KHR_parallel_shader_compile`), guided by timing every program on its own with the browser's and the driver's shader caches defeated, and after finding that ANGLE on Direct3D 11 recompiles multi-render-target programs at their first draw.
-- **Tested and shipped**: before the web version is published, GitHub Actions renders four fixed scenes in headless Chromium with software WebGL, with the seed, hour, random numbers and clock all pinned, and compares them pixel by pixel with reference pictures. Versioned releases for Lively Wallpaper and Wallpaper Engine; English / Chinese settings generated from one schema.
+- **Tested and shipped**: before the web version is published, GitHub Actions renders five fixed scenes in headless Chromium with software WebGL, with the seed, hour, random numbers and clock all pinned, and compares them pixel by pixel with reference pictures. Versioned releases for Lively Wallpaper and Wallpaper Engine; English / Chinese settings generated from one schema.
 
 More detail in [How it works](#how-it-works), and two write-ups:
 
@@ -63,6 +63,8 @@ Wallpaper Engine has no buttons in its settings, so **New seabed** and **Show se
 | Hold the mouse button still on the water | Sprinkles fish food: it floats, then slowly sinks, and the fish rush over to eat it (a stingray cleans up what reaches the bottom) |
 | Hold the cursor still | Curious little fish gather around it |
 | Go near a hermit crab | It pulls back into its shell, then carries on, leaving tiny footprints |
+| Click by a sea anemone | Its clownfish dive in among the tentacles and the anemone pulls in; a few seconds later they come out again |
+| Move slowly towards the octopus | It stops, presses itself flat and turns the colour of the seabed. Startle it instead and it squirts ink and jets away |
 | Click right beside the dolphins | Startled, one leaps clear of the water and crashes back in with a burst of whitewater |
 | At night | A path of moonlight glitters on the ripples out over the deep water. Touching the water lights up glowing plankton; jellyfish and breaking surf glow. Now and then a nest of turtle hatchlings breaks open on the beach and they scramble down to the sea, leaving tiny tracks (they freeze if you sweep the cursor over them) |
 | Nothing at all | Waves arrive in sets and at an angle: the swell slows and steepens in the shallows (focusing a bright band of light on the sand), breaks into whitewater, runs up the beach and drains back in streaks of foam, leaving a foam line at the top; wet sand darkens and the churned water clouds for a moment |
@@ -75,7 +77,7 @@ Wallpaper Engine has no buttons in its settings, so **New seabed** and **Show se
 - **New seabed** and **fixed seabed number**: every start makes a new seabed; to keep one you like, use its number.
 - **Tides**: the sea rises and falls with real time, about every 12.4 hours, so the beach widens and narrows.
 - Caustic light, wave size and speed, mouse ripples, rain, cloud shadows.
-- **Corals**, small fish, big fish, rays, sea turtles (green, hawksbill, olive ridley), **dolphins**, **reef sharks**, jellyfish, hermit crabs & gulls, **turtle hatchlings**, floating flowers & leaves, **feed the fish**.
+- **Corals**, small fish, big fish, rays, sea turtles (green, hawksbill, olive ridley), **dolphins**, **reef sharks**, **clownfish & anemones**, **octopus**, jellyfish, hermit crabs & gulls, **turtle hatchlings**, floating flowers & leaves, **feed the fish**.
 - **Wave sounds** (off by default) and **volume**: surf in step with the picture, and a plop when you tap the water.
 - **Save power when idle** (on by default): after 45 seconds without the mouse it drops to 30 FPS, and is back to full speed as soon as the mouse moves.
 - **Quality** and **limit to 30 FPS**: turn these down on a slow graphics card or on battery. It never draws more than 60 FPS, even on a high-refresh screen. On a 2560×1600 laptop at 30 FPS it uses about 38% of an Intel Arc 140T at native resolution, about 25% at 75% and about 18% at 50%.
@@ -97,7 +99,7 @@ src/                          the source of sea.js, by subject (see src/README.m
   shaders/                    GLSL: the seabed passes, ripples, sprites (one file per group of creatures), the final image
   creatures/                  spawning and behaviour: fish, rays, turtles, jellies, dolphins, sharks, hatchlings
 tools/build.py                joins src/ into shallow-sea/sea.js; `--check` fails if sea.js is out of date
-tools/render_test.py          renders four fixed scenes and compares them with tests/render/ (see src/README.md)
+tools/render_test.py          renders five fixed scenes and compares them with tests/render/ (see src/README.md)
 tools/make_video.py           renders the intro video: scripted shots with a cursor and captions, in English and Chinese
 tests/render/                 the render test's reference pictures
 docs/                         the screenshots in this README, and the write-ups
@@ -130,7 +132,7 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 - **Caustics**: for each point on the seabed the shader finds which surface point refracted the sunlight there; brightness is 1 / |det| of the refraction map's Jacobian, so your ripples cast matching rings of light on the sand.
 - **Sparkles**: every few pixels of water hold one tiny ripple facet that takes a new tilt every half second or so. When that tilt, on top of the wave it rides, mirrors the sun (or, at night, the moon along its path) toward the eye, it flashes up and fades as a sharp point, the brightest with a small cross of glare. At dawn and sunset the sand, foam and sparkles turn golden while the deep water stays blue.
 - **Coral reefs**: in patches at middle depths a bed of coral rubble is crowded with brain, table, staghorn, boulder and cauliflower corals, each casting a shadow and raising the seabed so the light patterns and ripples follow them. Out in the deep water a coral garden now and then crowds a mound that rises toward the light: antler-branched staghorns, fine bushy and fluffy colonies and lacy sea fans in orange, pink, lilac and white, each drawn as branches forking outward to pale growing tips, the taller ones overlapping the lower. They are drawn into the seabed once, when it is built.
-- **Sea life**: small silver-flanked fish school as boids (flashing as they turn), big fish roam alone (a yellow tang, a sergeant major, a bluefin trevally), a blue-spotted stingray rests on the shallow sand, an eagle ray and a manta fly through the water, green, hawksbill and olive ridley turtles drift by and surface to breathe (each arrival may be a different species: the hawksbill with its tortoiseshell and serrated shell, the small, round, plain olive ridley), every few minutes a pod of bottlenose dolphins crosses the deep water in formation (each one rising to breathe in turn, now and then one leaping clear of the water and crashing back in, scattering the fish), now and then a blacktip reef shark (sometimes two) patrols the reef edge, its body sweeping side to side, while the fish keep well clear and a splash sends it off, moon jellies (four lilac horseshoe gonads) and spotted lagoon jellies (round blue or golden domes dusted with white spots, short club-tipped arms trailing behind) pulse along in deeper water, and at night their spots, rims and clubs glow. All are drawn as signed-distance shapes and cast shadows along the refracted sun direction.
+- **Sea life**: small silver-flanked fish school as boids (flashing as they turn), big fish roam alone (a yellow tang, a sergeant major, a bluefin trevally), a blue-spotted stingray rests on the shallow sand, an eagle ray and a manta fly through the water, green, hawksbill and olive ridley turtles drift by and surface to breathe (each arrival may be a different species: the hawksbill with its tortoiseshell and serrated shell, the small, round, plain olive ridley), every few minutes a pod of bottlenose dolphins crosses the deep water in formation (each one rising to breathe in turn, now and then one leaping clear of the water and crashing back in, scattering the fish), now and then a blacktip reef shark (sometimes two) patrols the reef edge, its body sweeping side to side, while the fish keep well clear and a splash sends it off, moon jellies (four lilac horseshoe gonads) and spotted lagoon jellies (round blue or golden domes dusted with white spots, short club-tipped arms trailing behind) pulse along in deeper water, and at night their spots, rims and clubs glow. Bubble-tip sea anemones grow on the shallow sand, each home to two or three clownfish (orange with three black-edged white bands) that hover over the tentacles, dart out for food, dive in among them when startled while the anemone pulls in, and sleep there at night. An octopus creeps over the seabed, its arms reaching and curling; it takes on the colours of whatever it sits on, so when it stops it all but vanishes, and if you come close slowly it presses itself flat and disappears. Startle it and it flashes dark red with pale spots, squirts a cloud of ink and jets away mantle first. All are drawn as signed-distance shapes and cast shadows along the refracted sun direction.
 
 ## License
 
@@ -140,9 +142,9 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 
 ## 中文說明
 
-從正上方看下去的一段熱帶海岸：浪一組一組沖上沙灘，海水從清澈的淺水、珊瑚礁、土耳其藍漸層到深藍色；魚群、魟魚、海龜（綠蠵龜、玳瑁、欖蠵龜）和水母在裡面游，偶爾還有一群海豚經過（有時會躍出水面），或一隻黑鰭礁鯊沿著珊瑚礁巡游。全部用 WebGL2 即時運算，可以當 Windows 上 [Lively Wallpaper](https://github.com/rocksdanister/lively) 或 Wallpaper Engine 的桌布，也可以直接在瀏覽器（含手機）玩。
+從正上方看下去的一段熱帶海岸：浪一組一組沖上沙灘，海水從清澈的淺水、珊瑚礁、土耳其藍漸層到深藍色；魚群、魟魚、海龜（綠蠵龜、玳瑁、欖蠵龜）和水母在裡面游，偶爾還有一群海豚經過（有時會躍出水面），或一隻黑鰭礁鯊沿著珊瑚礁巡游。淺水沙地上的海葵裡住著小丑魚，還有一隻會變色、躲進海床裡的章魚。全部用 WebGL2 即時運算，可以當 Windows 上 [Lively Wallpaper](https://github.com/rocksdanister/lively) 或 Wallpaper Engine 的桌布，也可以直接在瀏覽器（含手機）玩。
 
-**技術重點**：沒有用任何引擎或函式庫，約 4,000 行手寫的 JavaScript 與 GLSL 直接用 WebGL2，原始碼依主題放在 [`src/`](src/README.md)，再合併成一支程式。水的光學照物理算（Snell 折射、以折射映射 Jacobian 行列式計算的焦散、Beer–Lambert 分色吸收、Fresnel 反射、水面微面元反光）；漣漪在 GPU 上解淺水波方程，波速隨水深變化（c = √(gh)）；海床、珊瑚礁和十幾種生物全部程序化生成。遠方的風浪也會感受水深：在淺水變慢、變短、變高，並轉向與海岸平行。逐一量測每個著色器的編譯時間找出瓶頸，把一個巨大的海床著色器拆成六段、生物著色器拆成四個，全部平行編譯後，更新後第一次啟動從約 42 秒縮短到約 2.3 秒。每次推送時，GitHub Actions 會先用無頭 Chromium 和軟體 WebGL 畫出四個固定的場景（海床、時間、隨機數和時鐘全部固定），逐像素和參考圖比對，通過了才發布網頁版。
+**技術重點**：沒有用任何引擎或函式庫，約 4,000 行手寫的 JavaScript 與 GLSL 直接用 WebGL2，原始碼依主題放在 [`src/`](src/README.md)，再合併成一支程式。水的光學照物理算（Snell 折射、以折射映射 Jacobian 行列式計算的焦散、Beer–Lambert 分色吸收、Fresnel 反射、水面微面元反光）；漣漪在 GPU 上解淺水波方程，波速隨水深變化（c = √(gh)）；海床、珊瑚礁和十幾種生物全部程序化生成。遠方的風浪也會感受水深：在淺水變慢、變短、變高，並轉向與海岸平行。逐一量測每個著色器的編譯時間找出瓶頸，把一個巨大的海床著色器拆成六段、生物著色器拆成四個，全部平行編譯後，更新後第一次啟動從約 42 秒縮短到約 2.3 秒。每次推送時，GitHub Actions 會先用無頭 Chromium 和軟體 WebGL 畫出五個固定的場景（海床、時間、隨機數和時鐘全部固定），逐像素和參考圖比對，通過了才發布網頁版。
 
 **技術文章**：
 
@@ -174,6 +176,8 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 | 在水面上按住滑鼠不動 | 撒飼料：先浮在水面，再慢慢沉下去，魚會衝過來搶食（沉到底的會被藍點魟吃掉） |
 | 游標停著不動幾秒 | 好奇的小魚會慢慢游過來繞著游標 |
 | 靠近寄居蟹 | 牠會縮進殼裡，過幾秒才探出頭繼續爬，沿路留下小腳印 |
+| 在海葵旁邊點一下 | 小丑魚會躲進觸手裡，海葵也縮起來；過幾秒小丑魚又游出來 |
+| 游標慢慢靠近章魚 | 牠會停下來、壓低身體，變成和海床一樣的顏色；如果嚇到牠，牠會噴墨汁逃走 |
 | 在海豚旁邊點一下 | 受驚的海豚會躍出水面，再「啪」一聲濺起白浪落回水裡 |
 | 晚上 | 深水區的海面上有一條閃爍的月光路。碰到海水的地方會亮起藍色螢光浮游生物；水母和浪花也會發光。偶爾沙灘上會有一窩小海龜孵化，一路爬向大海、留下小小的爬痕（游標掃過時牠們會停住不動） |
 | 什麼都不做 | 浪一組一組、斜斜地打進來：湧浪在淺水裡變慢變陡，碎成白浪沖上沙灘，再拖著泡沫條紋退回去，最高處留下一道泡沫線 |
@@ -186,7 +190,7 @@ Open `http://localhost:8765/` (wallpaper version) or `http://localhost:8765/web.
 - **重新產生海床／固定海床編號**：每次啟動都是新的一片；喜歡現在這片就把編號填進去
 - **潮汐**：照真實時間大約每 12.4 小時漲退一次
 - 光紋強度、波浪大小／速度、滑鼠漣漪強度、雨、雲影
-- **珊瑚**、小魚數量、大魚、魟魚、海龜（三種）、**海豚**、水母數量、寄居蟹與海鷗、**小海龜孵化**、漂浮的花與葉、**餵魚**
+- **珊瑚**、小魚數量、大魚、魟魚、海龜（三種）、**海豚**、**礁鯊**、**小丑魚與海葵**、**章魚**、水母數量、寄居蟹與海鷗、**小海龜孵化**、漂浮的花與葉、**餵魚**
 - **海浪聲**（預設關閉）與**音量**
 - **閒置時省電**（預設開）：滑鼠 45 秒沒動就降到 30 FPS，一動馬上恢復
 - **畫質／鎖定 30 FPS**：顯示卡較弱或用電池時可以調低。不論螢幕更新率多高，最多只畫 60 FPS。在 2560×1600 筆電、30 FPS 下，原生解析度約佔 Intel Arc 140T 的 38%，75% 約 25%，50% 約 18%

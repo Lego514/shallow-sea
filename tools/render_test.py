@@ -44,6 +44,11 @@ SCENES = [
      'sea.spawnDolphins(); sea.spawnSharks(); run(1);'
      'bring(sea.dolphins, 1.15, 0.62); bring(sea.sharks, 0.95, 0.3);'
      'run(10); sea.leapDolphin(1); run(20);'),
+    # the reef's residents: an octopus settled beside an anemone, then startled by a splash into a jet and a cloud of ink
+    ('reef', 'seed=1999&hour=11&tide=0',
+     'run(10); const a = sea.anemones[0], o = sea.octopus;'
+     'o.x = a.x + 0.2; o.y = a.y; o.state = "rest"; o.timer = 99; run(15);'
+     'sea.splash((o.x - 0.05) / (innerWidth / innerHeight), 1 - o.y); run(12);'),
 ]
 
 # a pixel counts as different when a colour channel is off by more than PIXEL_TOL (of 255); a scene fails when more
